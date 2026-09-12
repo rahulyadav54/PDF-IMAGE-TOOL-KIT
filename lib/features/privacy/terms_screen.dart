@@ -65,7 +65,7 @@ class TermsScreen extends StatelessWidget {
           Text('Contact', style: textTheme.titleSmall),
           const SizedBox(height: 8),
           Text(
-            AppConstants.supportEmail,
+            '${AppConstants.supportEmail}\nPhone: ${AppConstants.supportPhone}',
             style: textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.sectionGap),

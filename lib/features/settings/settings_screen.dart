@@ -373,6 +373,17 @@ class SettingsScreen extends ConsumerWidget {
               }
             },
           ),
+          SettingsRow(
+            icon: Icons.phone_outlined,
+            title: 'Support phone',
+            subtitle: AppConstants.supportPhone,
+            onTap: () async {
+              final uri = Uri(scheme: 'tel', path: AppConstants.supportPhone);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+          ),
           const SizedBox(height: AppSpacing.lg),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: AppSpacing.screenH),

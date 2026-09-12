@@ -105,7 +105,8 @@ class PrivacyScreen extends StatelessWidget {
           Text('Contact', style: textTheme.titleSmall),
           const SizedBox(height: 8),
           Text(
-            'Questions about privacy: ${AppConstants.supportEmail}',
+            'Questions about privacy: ${AppConstants.supportEmail}\n'
+            'Phone: ${AppConstants.supportPhone}',
             style: textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.md),

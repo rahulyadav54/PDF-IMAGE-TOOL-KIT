@@ -38,7 +38,7 @@ Core processing happens locally. Your documents are not uploaded to our servers 
 
 Free version includes ads and fair-use limits. Upgrade to Pro for unlimited access.
 
-Questions? Contact support@pdftoolbox.app
+Questions? Contact zayacodehub@gmail.com or +917033399183
 
 ## Category
 Productivity

@@ -11,7 +11,8 @@ class AppConstants {
   static const String appTagline = 'PDF Editor & Tools';
 
   static const String companyName = 'ZAYA CODE HUB';
-  static const String supportEmail = 'support@pdftoolbox.app';
+  static const String supportEmail = 'zayacodehub@gmail.com';
+  static const String supportPhone = '+917033399183';
   static const String privacyPolicyUrl =
       'https://docforge-pdf.vercel.app/privacy';
   static const String playStoreUrl =

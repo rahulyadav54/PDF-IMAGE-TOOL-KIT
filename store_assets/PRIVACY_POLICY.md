@@ -2,7 +2,7 @@
 
 **Last updated:** March 2026  
 **Developer:** ZAYA CODE HUB  
-**Contact:** support@pdftoolbox.app
+**Contact:** zayacodehub@gmail.com | +917033399183
 
 ## Overview
 
@@ -48,4 +48,4 @@ We may update this policy. Continued use after changes constitutes acceptance.
 
 ## Contact
 
-support@pdftoolbox.app
+zayacodehub@gmail.com | +917033399183
