@@ -14,6 +14,7 @@ class MainShell extends StatelessWidget {
     if (location.startsWith('/files') || location.startsWith('/documents')) {
       return 1;
     }
+    if (location.startsWith('/scan')) return 2;
     if (location.startsWith('/tools-hub')) return 3;
     if (location.startsWith('/settings')) return 4;
     return 0;
@@ -27,55 +28,62 @@ class MainShell extends StatelessWidget {
 
     return AppExitGuard(
       child: Scaffold(
-      body: child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          border: Border(top: BorderSide(color: scheme.outlineVariant)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
-            child: Row(
-              children: [
-                _NavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home_rounded,
-                  label: 'Home',
-                  selected: selected == 0,
-                  onTap: () => context.go('/'),
-                ),
-                _NavItem(
-                  icon: Icons.folder_outlined,
-                  selectedIcon: Icons.folder_rounded,
-                  label: 'Files',
-                  selected: selected == 1,
-                  onTap: () => context.go('/files'),
-                ),
-                _ScanNavItem(
-                  selected: false,
-                  onTap: () => context.push('/scan-to-pdf'),
-                ),
-                _NavItem(
-                  icon: Icons.apps_outlined,
-                  selectedIcon: Icons.apps_rounded,
-                  label: 'Tools',
-                  selected: selected == 3,
-                  onTap: () => context.go('/tools-hub'),
-                ),
-                _NavItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: 'Settings',
-                  selected: selected == 4,
-                  onTap: () => context.go('/settings'),
-                ),
-              ],
+        body: child,
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            border: Border(top: BorderSide(color: scheme.outlineVariant)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: 4,
+              ),
+              child: Row(
+                children: [
+                  _NavItem(
+                    icon: Icons.home_outlined,
+                    selectedIcon: Icons.home_rounded,
+                    label: 'Home',
+                    selected: selected == 0,
+                    onTap: () => context.go('/'),
+                  ),
+                  _NavItem(
+                    icon: Icons.folder_outlined,
+                    selectedIcon: Icons.folder_rounded,
+                    label: 'Files',
+                    selected: selected == 1,
+                    onTap: () => context.go('/files'),
+                  ),
+                  _NavItem(
+                    icon: Icons.document_scanner_outlined,
+                    selectedIcon: Icons.document_scanner_rounded,
+                    label: 'Scan',
+                    selected: selected == 2,
+                    emphasized: true,
+                    onTap: () => context.push('/scan-to-pdf'),
+                  ),
+                  _NavItem(
+                    icon: Icons.apps_outlined,
+                    selectedIcon: Icons.apps_rounded,
+                    label: 'Tools',
+                    selected: selected == 3,
+                    onTap: () => context.go('/tools-hub'),
+                  ),
+                  _NavItem(
+                    icon: Icons.settings_outlined,
+                    selectedIcon: Icons.settings_rounded,
+                    label: 'Settings',
+                    selected: selected == 4,
+                    onTap: () => context.go('/settings'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -88,6 +96,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.emphasized = false,
   });
 
   final IconData icon;
@@ -95,10 +104,17 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.electricBlue : Theme.of(context).colorScheme.onSurfaceVariant;
+    final scheme = Theme.of(context).colorScheme;
+    final active = selected || emphasized;
+    final color = selected
+        ? AppColors.electricBlue
+        : emphasized
+            ? AppColors.electricBlue
+            : scheme.onSurfaceVariant;
 
     return Expanded(
       child: InkWell(
@@ -109,74 +125,38 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? selectedIcon : icon, size: 24, color: color),
+              if (emphasized)
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.electricBlue
+                        : AppColors.electricBlue.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    selected ? selectedIcon : icon,
+                    size: 22,
+                    color: selected ? Colors.white : AppColors.electricBlue,
+                  ),
+                )
+              else
+                Icon(
+                  selected ? selectedIcon : icon,
+                  size: 24,
+                  color: color,
+                ),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                   color: color,
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScanNavItem extends StatelessWidget {
-  const _ScanNavItem({required this.selected, required this.onTap});
-
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Transform.translate(
-        offset: const Offset(0, -10),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            customBorder: const CircleBorder(),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: AppColors.electricBlue,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.electricBlue.withValues(alpha: 0.28),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.document_scanner_outlined,
-                    color: Colors.white,
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Scan',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.electricBlue,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

@@ -49,13 +49,17 @@ class BatchProgress {
     required this.current,
     required this.total,
     required this.currentFileName,
+    this.failedCount = 0,
   });
 
   final int current;
   final int total;
   final String currentFileName;
+  final int failedCount;
 
   double get fraction => total > 0 ? current / total : 0;
+
+  int get completedCount => (current - failedCount).clamp(0, total);
 }
 
 class BatchRunResult {

@@ -5,15 +5,18 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import 'package:pdf_image_toolbox/features/pdf_editor/services/pdf_text_extraction_service.dart';
 
+import 'pdf_test_helpers.dart';
+
 void main() {
-  test('extracts text objects with font metadata from PDF', () {
-    final document = PdfDocument();
-    final page = document.pages.add();
+  test('extracts text objects with font metadata from PDF', () async {
+    final draft = PdfDocument();
+    final page = draft.pages.add();
     page.graphics.drawString(
       'Rahul Kumar',
       PdfStandardFont(PdfFontFamily.helvetica, 14),
       bounds: const Rect.fromLTWH(72, 700, 200, 20),
     );
+    final document = await materializePdf(draft);
 
     const service = PdfTextExtractionService();
     final objects = service.extractTextObjects(document);

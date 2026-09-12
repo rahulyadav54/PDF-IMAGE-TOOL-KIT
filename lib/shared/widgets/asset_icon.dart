@@ -18,6 +18,8 @@ class AssetIcon extends StatelessWidget {
   final Color? color;
   final String? semanticLabel;
 
+  static final Map<String, bool> _assetCache = {};
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<bool>(
@@ -39,6 +41,8 @@ class AssetIcon extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            gaplessPlayback: true,
             errorBuilder: (_, __, ___) => Icon(
               fallbackIcon,
               size: size,
@@ -51,10 +55,15 @@ class AssetIcon extends StatelessWidget {
   }
 
   static Future<bool> _assetExists(String path) async {
+    final cached = _assetCache[path];
+    if (cached != null) return cached;
+
     try {
       await rootBundle.load(path);
+      _assetCache[path] = true;
       return true;
     } catch (_) {
+      _assetCache[path] = false;
       return false;
     }
   }

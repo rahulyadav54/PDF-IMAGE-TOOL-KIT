@@ -1,11 +1,14 @@
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/utils/filename_generator.dart';
+import '../../../core/utils/path_security.dart';
+import '../../../shared/services/bulk_processing/cancel_token.dart';
 import '../../../shared/services/file_service.dart';
+import '../../../shared/services/temp_file_service.dart';
 import '../models/batch_file_item.dart';
 import '../models/batch_operation_type.dart';
 import '../models/batch_result.dart';
@@ -27,6 +30,7 @@ class BatchProcessorEngine {
     required List<BatchFileItem> items,
     required BatchConfig config,
     BatchProgressCallback? onProgress,
+    CancelToken? cancelToken,
   }) async {
     if (items.isEmpty) {
       throw const ProcessingException('Add at least one file to process.');
@@ -34,14 +38,17 @@ class BatchProcessorEngine {
 
     final results = <BatchFileResult>[];
     var totalBytes = 0;
+    var failedCount = 0;
 
     for (var i = 0; i < items.length; i++) {
+      cancelToken?.throwIfCancelled();
       final item = items[i];
       onProgress?.call(
         BatchProgress(
           current: i + 1,
           total: items.length,
           currentFileName: item.fileName,
+          failedCount: failedCount,
         ),
       );
 
@@ -57,6 +64,7 @@ class BatchProcessorEngine {
           totalBytes += result.outputSizeBytes!;
         }
       } on AppException catch (e) {
+        failedCount++;
         results.add(
           BatchFileResult.failure(
             inputPath: item.filePath,
@@ -65,6 +73,7 @@ class BatchProcessorEngine {
           ),
         );
       } catch (_) {
+        failedCount++;
         results.add(
           BatchFileResult.failure(
             inputPath: item.filePath,
@@ -108,24 +117,24 @@ class BatchProcessorEngine {
     String operationId,
     List<BatchFileResult> successes,
   ) async {
-    final archive = Archive();
-
-    for (final result in successes) {
-      final file = File(result.outputPath!);
-      final bytes = await file.readAsBytes();
-      archive.addFile(
-        ArchiveFile(file.uri.pathSegments.last, bytes.length, bytes),
-      );
-    }
-
-    final zipBytes = ZipEncoder().encode(archive);
+    final fileService = _ref.read(fileServiceProvider);
+    final tempService = _ref.read(tempFileServiceProvider);
     final zipFileName = FilenameGenerator.batchZip(operationId);
-    final zipPath = await _ref.read(fileServiceProvider).saveToOutput(
-      zipFileName,
-      zipBytes,
-    );
+    final tempZipPath = await tempService.createTempFile(extension: '.zip');
 
-    return _ZipOutput(path: zipPath, fileName: zipFileName);
+    final encoder = ZipFileEncoder();
+    encoder.create(tempZipPath);
+    for (final result in successes) {
+      encoder.addFile(File(result.outputPath!));
+    }
+    encoder.close();
+
+    final outputDir = await fileService.getOutputDirectory();
+    final outputPath = PathSecurity.outputPath(outputDir, zipFileName);
+    await File(tempZipPath).copy(outputPath);
+    await tempService.delete(tempZipPath);
+
+    return _ZipOutput(path: outputPath, fileName: zipFileName);
   }
 }
 

@@ -1,4 +1,4 @@
-# PDF & Image Toolbox
+# DocForge — PDF Editor & Tools
 
 Offline-first Android utility app for PDF and image manipulation. All core processing happens on-device.
 

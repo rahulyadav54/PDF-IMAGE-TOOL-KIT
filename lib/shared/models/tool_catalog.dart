@@ -65,6 +65,18 @@ abstract final class ToolCatalog {
     }
   }
 
+  static final List<ToolCatalogEntry> scanTools = [
+    fromTool(ToolType.scanToPdf),
+    fromTool(ToolType.idCardScanner),
+    fromTool(ToolType.receiptScanner),
+    fromTool(ToolType.bookScanner),
+    fromTool(ToolType.cleanDocument),
+  ];
+
+  static final List<ToolCatalogEntry> documentTools = [
+    fromTool(ToolType.batchProcessor),
+  ];
+
   static final List<ToolCatalogEntry> pdfTools = [
     fromTool(ToolType.scanToPdf),
     fromTool(ToolType.editPdf),
@@ -93,6 +105,16 @@ abstract final class ToolCatalog {
       keywords: ['rotate', 'reorder', 'orientation', 'sort', 'pages'],
     ),
     fromTool(ToolType.protectPdf),
+    fromTool(ToolType.extractText),
+    fromTool(ToolType.pdfMetadata),
+    fromTool(ToolType.signPdf),
+    fromTool(ToolType.searchablePdf),
+    fromTool(ToolType.pdfWatermark),
+    fromTool(ToolType.fixMyPdf),
+    fromTool(ToolType.findReplace),
+    fromTool(ToolType.pdfRedaction),
+    fromTool(ToolType.pdfFormFiller),
+    fromTool(ToolType.pdfComparison),
   ];
 
   static final List<ToolCatalogEntry> imageTools = [
@@ -108,6 +130,9 @@ abstract final class ToolCatalog {
 
   static final List<ToolCatalogEntry> otherTools = [
     fromTool(ToolType.batchProcessor),
+    fromTool(ToolType.unlockPdf),
+    fromTool(ToolType.workflows),
+    fromTool(ToolType.secureVault),
   ];
 
   static List<ToolCatalogEntry> get all => [
@@ -139,6 +164,22 @@ abstract final class ToolCatalog {
     fromTool(ToolType.compressPdf),
     fromTool(ToolType.mergePdf),
     fromTool(ToolType.splitPdf),
+  ];
+
+  /// Primary home actions — featured at top of Home.
+  static List<ToolCatalogEntry> homeStartWith = [
+    fromTool(ToolType.scanToPdf),
+    fromTool(ToolType.editPdf),
+    fromTool(ToolType.compressPdf),
+    fromTool(ToolType.imageToPdf),
+  ];
+
+  /// Secondary home grid — compact quick actions.
+  static List<ToolCatalogEntry> homeQuickActions = [
+    fromTool(ToolType.mergePdf),
+    fromTool(ToolType.splitPdf),
+    fromTool(ToolType.pdfToImage),
+    fromTool(ToolType.batchProcessor),
   ];
 
   static List<ToolCatalogEntry> homeImageTools = [

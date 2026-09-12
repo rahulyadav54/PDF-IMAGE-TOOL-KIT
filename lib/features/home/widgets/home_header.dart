@@ -22,9 +22,9 @@ class HomeHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                AppConstants.appName,
+                AppConstants.appNameShort,
                 style: AppTypography.display(context).copyWith(fontSize: 22),
-                maxLines: 2,
+                maxLines: 1,
               ),
               const SizedBox(height: 4),
               Text(

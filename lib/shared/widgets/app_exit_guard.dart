@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/constants/app_constants.dart';
+
 /// Intercepts the system back action and asks before closing the app.
 class AppExitGuard extends StatefulWidget {
   const AppExitGuard({super.key, required this.child});
@@ -18,7 +20,7 @@ class _AppExitGuardState extends State<AppExitGuard> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Exit app?'),
-        content: const Text('Are you sure you want to close PDF & Image Toolbox?'),
+        content: Text('Are you sure you want to close ${AppConstants.appNameShort}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),

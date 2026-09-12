@@ -5,8 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_shadows.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../shared/assets/tool_assets.dart';
-import '../../../shared/widgets/asset_icon.dart';
+import '../../../shared/widgets/tool_icon_badge.dart';
 
 class ProCard extends StatelessWidget {
   const ProCard({super.key});
@@ -33,12 +32,10 @@ class ProCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                AssetIcon(
-                  assetPath: ToolAssets.upgradePro,
-                  fallbackIcon: Icons.verified_rounded,
-                  size: 72,
-                  color: AppColors.purple,
-                  semanticLabel: 'All tools unlocked',
+                ToolIconBadge(
+                  icon: Icons.workspace_premium_rounded,
+                  accentColor: AppColors.purple,
+                  dimension: 56,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

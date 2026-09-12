@@ -1,3 +1,5 @@
+import '../../core/constants/app_constants.dart';
+
 /// Feature access flags for the app.
 class Entitlements {
   const Entitlements({
@@ -14,8 +16,13 @@ class Entitlements {
   final bool adsRemoved;
   final int dailyLimit;
 
-  /// Full access for every user — no payment required.
-  static const Entitlements premium = Entitlements();
+  static const Entitlements premium = Entitlements(
+    isPro: true,
+    batchProcessing: true,
+    premiumCompression: true,
+    adsRemoved: true,
+    dailyLimit: -1,
+  );
 
   /// Legacy free tier (kept for tests only).
   static const Entitlements free = Entitlements(
@@ -23,7 +30,7 @@ class Entitlements {
     batchProcessing: false,
     premiumCompression: false,
     adsRemoved: false,
-    dailyLimit: 5,
+    dailyLimit: AppConstants.freeDailyOperationLimit,
   );
 
   bool canPerformOperation(int operationsUsedToday) {

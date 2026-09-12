@@ -41,8 +41,11 @@ PdfViewerRouteData parsePdfViewerRoute(Object? extra) {
       );
     }
   }
-  throw ArgumentError('Invalid PDF viewer route extra.');
+  return const PdfViewerRouteData(filePath: '');
 }
+
+bool isValidPdfViewerRoute(PdfViewerRouteData data) =>
+    data.filePath.trim().isNotEmpty;
 
 class PdfViewerRouteData {
   const PdfViewerRouteData({required this.filePath, this.title});

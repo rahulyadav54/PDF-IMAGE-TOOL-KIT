@@ -77,6 +77,34 @@ class EnhancementCacheService {
     }
   }
 
+  /// Removes oldest cache files when total size exceeds [maxTotalBytes].
+  Future<void> prune({required int maxTotalBytes}) async {
+    final dir = await _directory();
+    if (!await dir.exists()) return;
+
+    final files = <File>[];
+    var total = 0;
+    await for (final entity in dir.list()) {
+      if (entity is! File) continue;
+      final stat = await entity.stat();
+      files.add(entity);
+      total += stat.size;
+    }
+
+    if (total <= maxTotalBytes) return;
+
+    files.sort(
+      (a, b) => a.statSync().modified.compareTo(b.statSync().modified),
+    );
+
+    for (final file in files) {
+      if (total <= maxTotalBytes) break;
+      final size = await file.length();
+      await file.delete();
+      total -= size;
+    }
+  }
+
   Future<String> _cacheKey({
     required String sourcePath,
     required ScanEnhanceKind kind,

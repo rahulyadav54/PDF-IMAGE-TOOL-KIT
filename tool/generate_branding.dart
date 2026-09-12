@@ -83,7 +83,7 @@ Image _createFeatureGraphic(int width, int height) {
     image,
     textX,
     titleY,
-    'PDF & Image Toolbox',
+    'DocForge',
     _white,
     (height * 0.11).round(),
   );

@@ -11,7 +11,7 @@ class ToolsHorizontalRow extends StatelessWidget {
     required this.entries,
     required this.onTap,
     this.cardWidth = 112,
-    this.iconSize = 72,
+    this.iconSize = 52,
   });
 
   final List<ToolCatalogEntry> entries;
@@ -22,7 +22,7 @@ class ToolsHorizontalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: cardWidth + 36,
+      height: cardWidth + 28,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),

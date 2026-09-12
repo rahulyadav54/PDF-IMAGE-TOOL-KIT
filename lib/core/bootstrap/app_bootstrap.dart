@@ -19,18 +19,22 @@ class AppBootstrap {
 
   /// Initializes optional third-party SDKs after the first frame is drawn.
   static Future<void> initializeDeferredServices() async {
-    if (!AdConfig.enabled) return;
-
     try {
-      await ConsentService.requestConsentIfNeeded();
-    } catch (error, stack) {
-      debugPrint('Consent init skipped: $error\n$stack');
-    }
+      if (AdConfig.enabled) {
+        try {
+          await ConsentService.requestConsentIfNeeded();
+        } catch (error, stack) {
+          debugPrint('Consent init skipped: $error\n$stack');
+        }
 
-    try {
-      await AdService.initialize();
+        try {
+          await AdService.initialize();
+        } catch (error, stack) {
+          debugPrint('AdMob init skipped: $error\n$stack');
+        }
+      }
     } catch (error, stack) {
-      debugPrint('AdMob init skipped: $error\n$stack');
+      debugPrint('Deferred init skipped: $error\n$stack');
     }
   }
 }

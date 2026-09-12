@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image/image.dart' as img;
-
 import '../../../core/errors/app_exception.dart';
 import '../../../shared/services/bulk_processing/cancel_token.dart';
 import '../../../shared/services/bulk_processing/worker_pool.dart';
@@ -151,7 +149,7 @@ class ImageEnhancementService {
     await File(outputPath).writeAsBytes(outputBytes, flush: true);
 
     if (useCache && !preview) {
-      await cacheService.store(
+      return cacheService.store(
         sourcePath: sourcePath,
         kind: kind,
         brightness: brightness,
@@ -180,6 +178,9 @@ class ImageEnhancementService {
 
     await WorkerPool.mapConcurrent<String, void>(
       items: sourcePaths,
+      concurrency: WorkerPool.recommendedImageConcurrency(
+        itemCount: sourcePaths.length,
+      ),
       cancelToken: cancelToken,
       onProgress: onProgress,
       worker: (path, _) async {
@@ -211,17 +212,16 @@ class ImageEnhancementService {
     required int jpegQuality,
   }) async {
     final bytes = await File(sourcePath).readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded != null) {
-      final oriented = img.bakeOrientation(decoded);
-      final tempService = _ref.read(tempFileServiceProvider);
-      final outputPath = await tempService.createTempFile(extension: '.jpg');
-      await File(outputPath).writeAsBytes(
-        img.encodeJpg(oriented, quality: jpegQuality.clamp(70, 95)),
-        flush: true,
-      );
-      return outputPath;
-    }
-    return sourcePath;
+    if (bytes.isEmpty) return sourcePath;
+
+    final outputBytes = await compute(
+      orientJpegInIsolate,
+      OrientJpegParams(bytes: bytes, quality: jpegQuality),
+    );
+
+    final tempService = _ref.read(tempFileServiceProvider);
+    final outputPath = await tempService.createTempFile(extension: '.jpg');
+    await File(outputPath).writeAsBytes(outputBytes, flush: true);
+    return outputPath;
   }
 }

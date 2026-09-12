@@ -93,6 +93,24 @@ class FilenameGenerator {
     return 'stitched_${direction}_$timestamp.jpg';
   }
 
+  static String extractedText(String originalPath) =>
+      withSuffix(originalPath, 'text', newExtension: '.txt');
+
+  static String searchablePdf(String originalPath) =>
+      withSuffix(originalPath, 'searchable', newExtension: '.pdf');
+
+  static String unlockedPdf(String originalPath) =>
+      withSuffix(originalPath, 'unlocked', newExtension: '.pdf');
+
+  static String watermarkedPdf(String originalPath) =>
+      withSuffix(originalPath, 'watermarked', newExtension: '.pdf');
+
+  static String metadataPdf(String originalPath) =>
+      withSuffix(originalPath, 'metadata', newExtension: '.pdf');
+
+  static String signedPdf(String originalPath) =>
+      withSuffix(originalPath, 'signed', newExtension: '.pdf');
+
   static String batchZip(String operationSlug) {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final slug = operationSlug.replaceAll(RegExp(r'[^a-z0-9]+'), '_').toLowerCase();

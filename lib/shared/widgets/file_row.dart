@@ -10,6 +10,7 @@ import '../../core/utils/incoming_file_types.dart';
 import '../models/recent_file.dart';
 import '../providers/recent_files_provider.dart';
 import '../services/file_actions_service.dart';
+import '../services/file_organization_service.dart';
 import '../services/starred_files_service.dart';
 import '../utils/file_opener.dart';
 
@@ -29,6 +30,8 @@ class FileRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fileActions = ref.read(fileActionsServiceProvider);
     final starred = ref.watch(starredPathsProvider);
+    final organization = ref.watch(fileOrganizationProvider);
+    final folder = organization.foldersByPath[file.filePath];
     final isStarred = starred.contains(file.filePath);
     final kind = IncomingFileTypes.detect(path: file.filePath);
     final typeLabel = IncomingFileTypes.label(kind);
@@ -82,7 +85,11 @@ class FileRow extends ConsumerWidget {
                         const SizedBox(height: 2),
                         Text(
                           isAvailable
-                              ? '$typeLabel • ${FileSizeFormatter.format(file.fileSizeBytes)}'
+                              ? [
+                                  typeLabel,
+                                  FileSizeFormatter.format(file.fileSizeBytes),
+                                  if (folder != null) folder,
+                                ].join(' • ')
                               : 'File is no longer available',
                           style: AppTypography.fileMeta(context).copyWith(
                             color: isAvailable ? null : AppColors.red,
@@ -127,10 +134,16 @@ class FileRow extends ConsumerWidget {
                           ),
                         ];
                       }
-                      return const [
-                        PopupMenuItem(value: 'open', child: Text('Open')),
-                        PopupMenuItem(value: 'share', child: Text('Share')),
-                        PopupMenuItem(value: 'remove', child: Text('Remove')),
+                      return [
+                        const PopupMenuItem(value: 'open', child: Text('Open')),
+                        const PopupMenuItem(value: 'share', child: Text('Share')),
+                        ...organization.folders.map(
+                          (f) => PopupMenuItem(
+                            value: 'folder:$f',
+                            child: Text('Move to $f'),
+                          ),
+                        ),
+                        const PopupMenuItem(value: 'remove', child: Text('Remove')),
                       ];
                     },
                   ),
@@ -157,6 +170,11 @@ class FileRow extends ConsumerWidget {
   ) async {
     if (value == 'remove') {
       await ref.read(recentFilesProvider.notifier).remove(file.id);
+      return;
+    }
+    if (value.startsWith('folder:')) {
+      final folder = value.substring('folder:'.length);
+      await ref.read(fileOrganizationProvider.notifier).setFolder(file.filePath, folder);
       return;
     }
     if (!isAvailable) return;

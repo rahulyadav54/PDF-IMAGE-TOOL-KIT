@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/errors/app_exception.dart';
+import '../../core/utils/progress_throttle.dart';
 import '../../core/utils/file_size_formatter.dart';
 import '../../shared/providers/recent_files_provider.dart';
 import '../../shared/services/entitlement_service.dart';
@@ -14,7 +16,11 @@ import '../../shared/widgets/empty_state_card.dart';
 import '../../shared/models/tool_type.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/tool_app_bar_title.dart';
+import '../../shared/services/bulk_processing/cancel_token.dart';
+import '../../shared/services/cache_maintenance_service.dart';
+import '../../shared/services/storage_guard_service.dart';
 import '../../shared/widgets/loading_overlay.dart';
+import '../../shared/widgets/processing_job_overlay.dart';
 import '../../shared/widgets/step_bar.dart';
 import '../image_to_pdf/services/image_validation_service.dart';
 import 'engine/batch_operation.dart';
@@ -42,6 +48,14 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
   bool _isProcessing = false;
   String? _fatalError;
   BatchProgress? _progress;
+  CancelToken? _cancelToken;
+  final _progressThrottle = ProgressThrottle();
+
+  @override
+  void dispose() {
+    _progressThrottle.dispose();
+    super.dispose();
+  }
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -98,10 +112,21 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
       }
 
       final before = ref.read(batchSessionProvider).files.length;
-      ref.read(batchSessionProvider.notifier).addFiles(items);
+      final remaining = AppConstants.maxBatchProcessorFiles - before;
+      if (remaining <= 0) {
+        _showMessage('Maximum ${AppConstants.maxBatchProcessorFiles} files per batch.');
+        return;
+      }
+
+      final limitedItems = items.take(remaining).toList();
+      ref.read(batchSessionProvider.notifier).addFiles(limitedItems);
       final after = ref.read(batchSessionProvider).files.length;
 
-      if (before == after && items.isNotEmpty) {
+      if (limitedItems.length < items.length) {
+        _showMessage(
+          'Added ${limitedItems.length} files (limit ${AppConstants.maxBatchProcessorFiles}).',
+        );
+      } else if (before == after && items.isNotEmpty) {
         _showMessage('Selected files are already in the queue.');
       }
     } on AppException catch (e) {
@@ -135,10 +160,15 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
       return;
     }
 
+    _cancelToken = CancelToken();
     setState(() {
       _fatalError = null;
       _isProcessing = true;
-      _progress = null;
+      _progress = BatchProgress(
+        current: 0,
+        total: session.files.length,
+        currentFileName: 'Starting...',
+      );
     });
 
     try {
@@ -149,16 +179,26 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
         );
       }
 
+      await ref.read(storageGuardServiceProvider).ensureSpaceForPaths(
+            session.files.map((f) => f.filePath).toList(),
+          );
+
       final result = await ref.read(batchProcessorEngineProvider).run(
         operation: operation,
         items: session.files,
         config: session.config,
+        cancelToken: _cancelToken,
         onProgress: (progress) {
-          if (mounted) setState(() => _progress = progress);
+          if (!mounted) return;
+          _progressThrottle.call(() {
+            if (!mounted) return;
+            setState(() => _progress = progress);
+          });
         },
       );
 
       await ref.read(entitlementServiceProvider).recordOperation();
+      await ref.read(cacheMaintenanceServiceProvider).runAfterHeavyJob();
 
       final recentService = ref.read(recentFilesServiceProvider);
       final entry = await recentService.createEntry(
@@ -182,6 +222,8 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
           ),
         ),
       );
+    } on BulkCancelledException {
+      if (mounted) _showMessage('Batch processing cancelled.');
     } on AppException catch (e) {
       if (mounted) setState(() => _fatalError = e.message);
     } catch (_) {
@@ -193,9 +235,25 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
         setState(() {
           _isProcessing = false;
           _progress = null;
+          _cancelToken = null;
         });
       }
     }
+  }
+
+  Future<void> _confirmCancel() async {
+    final shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel processing?'),
+        content: const Text('Completed files are kept. Remaining files will be skipped.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Continue')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel')),
+        ],
+      ),
+    );
+    if (shouldCancel == true) _cancelToken?.cancel();
   }
 
   @override
@@ -308,13 +366,14 @@ class _BatchProcessorScreenState extends ConsumerState<BatchProcessorScreen> {
           ),
         ),
         if (_isLoading) const LoadingOverlay(message: 'Validating files...'),
-        if (_isProcessing)
-          LoadingOverlay(
-            message: 'Processing batch...',
-            progress: _progress?.fraction,
-            progressLabel: _progress == null
-                ? null
-                : '${_progress!.current} / ${_progress!.total} • ${_progress!.currentFileName}',
+        if (_isProcessing && _progress != null)
+          ProcessingJobOverlay(
+            title: 'Processing documents',
+            completed: _progress!.current,
+            total: _progress!.total,
+            failed: _progress!.failedCount,
+            currentLabel: _progress!.currentFileName,
+            onCancel: _confirmCancel,
           ),
       ],
     );

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
+import 'bulk_processing/worker_pool.dart';
 import 'temp_file_service.dart';
 
 final thumbnailServiceProvider = Provider<ThumbnailService>((ref) {
@@ -35,12 +36,17 @@ class ThumbnailService {
     void Function(int completed, int total)? onProgress,
   }) async {
     final result = <String, String>{};
-    for (var i = 0; i < sourcePaths.length; i++) {
-      final path = sourcePaths[i];
-      final thumb = await generateThumbnail(path);
-      if (thumb != null) result[path] = thumb;
-      onProgress?.call(i + 1, sourcePaths.length);
-    }
+
+    await WorkerPool.mapConcurrent<String, void>(
+      items: sourcePaths,
+      concurrency: 3,
+      onProgress: onProgress,
+      worker: (path, _) async {
+        final thumb = await generateThumbnail(path);
+        if (thumb != null) result[path] = thumb;
+      },
+    );
+
     return result;
   }
 }

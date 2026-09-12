@@ -8,6 +8,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/utils/filename_generator.dart';
 import '../../../shared/services/bulk_processing/cancel_token.dart';
 import '../../../shared/services/file_service.dart';
+import '../../../shared/services/document_processing/pdf_page_layout.dart';
 import '../models/pdf_page_config.dart';
 import 'image_to_pdf_isolate.dart';
 
@@ -43,6 +44,7 @@ class ImageToPdfService {
     required PdfPageConfig config,
     int maxWidth = 2200,
     int jpegQuality = 88,
+    Set<String> preprocessedPaths = const {},
     ImageToPdfProgressCallback? onProgress,
     CancelToken? cancelToken,
   }) async {
@@ -67,12 +69,15 @@ class ImageToPdfService {
       }
 
       try {
-        final prepared = await _prepareImage(
-          path,
-          maxWidth: maxWidth,
-          jpegQuality: jpegQuality,
-        );
-        final pageFormat = config.resolveFormat(
+        final prepared = preprocessedPaths.contains(path)
+            ? await _loadPreparedImage(path)
+            : await _prepareImage(
+                path,
+                maxWidth: maxWidth,
+                jpegQuality: jpegQuality,
+              );
+        final layout = PdfPageLayout.resolve(
+          config: config,
           imageWidth: prepared.width,
           imageHeight: prepared.height,
         );
@@ -80,10 +85,8 @@ class ImageToPdfService {
 
         pdf.addPage(
           pw.Page(
-            pageFormat: pageFormat,
-            margin: config.pageSize == PdfPageSizeOption.fitToImage
-                ? pw.EdgeInsets.zero
-                : const pw.EdgeInsets.all(24),
+            pageFormat: layout.format,
+            margin: layout.margins,
             build: (context) => pw.Center(
               child: pw.Image(image, fit: pw.BoxFit.contain),
             ),
@@ -113,6 +116,16 @@ class ImageToPdfService {
       pageCount: pageCount,
       fileSizeBytes: pdfBytes.length,
       failedPaths: failedPaths,
+    );
+  }
+
+  Future<_PreparedImage> _loadPreparedImage(String path) async {
+    final rawBytes = await File(path).readAsBytes();
+    final prepared = await compute(loadPreparedJpegPage, rawBytes);
+    return _PreparedImage(
+      bytes: prepared.bytes,
+      width: prepared.width,
+      height: prepared.height,
     );
   }
 

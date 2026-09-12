@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_spacing.dart';
@@ -12,7 +13,12 @@ import '../../features/compress_pdf/models/compression_level.dart';
 import '../../features/image_to_pdf/models/image_pdf_processing_options.dart';
 import '../../features/pdf_to_image/models/image_export_format.dart';
 import '../../shared/providers/app_preferences_provider.dart';
+import '../../shared/providers/locale_provider.dart';
+import '../../shared/providers/purchase_provider.dart';
 import '../../shared/providers/recent_files_provider.dart';
+import '../../shared/services/app_lock_service.dart';
+import '../../shared/services/cache_maintenance_service.dart';
+import '../../shared/services/entitlement_service.dart';
 import '../../shared/widgets/company_branding.dart';
 import '../../shared/widgets/settings_row.dart';
 import 'widgets/preference_picker_sheet.dart';
@@ -24,6 +30,10 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themePref = ref.watch(themePreferenceProvider);
     final appPrefs = ref.watch(appPreferencesProvider);
+    final isPro = ref.watch(entitlementsProvider).valueOrNull?.isPro ?? false;
+    final purchaseState = ref.watch(purchaseUiProvider);
+    final appLockEnabled = ref.watch(appLockEnabledProvider);
+    final locale = ref.watch(localeProvider);
 
     return SafeArea(
       child: ListView(
@@ -57,10 +67,54 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Default file location',
             subtitle: 'App documents folder',
           ),
-          const SettingsRow(
+          SettingsRow(
             icon: Icons.language_outlined,
             title: 'Language',
-            subtitle: 'English',
+            subtitle: locale?.languageCode == 'es'
+                ? 'Español'
+                : locale?.languageCode == 'hi'
+                    ? 'हिन्दी'
+                    : 'English',
+            onTap: () async {
+              final selected = await showPreferencePicker<String>(
+                context: context,
+                title: 'Language',
+                selected: locale?.languageCode ?? 'en',
+                options: const [
+                  (label: 'English', subtitle: 'Default', value: 'en'),
+                  (label: 'Español', subtitle: 'Spanish', value: 'es'),
+                  (label: 'हिन्दी', subtitle: 'Hindi', value: 'hi'),
+                ],
+              );
+              if (selected != null) {
+                await ref.read(localeProvider.notifier).setLocale(Locale(selected));
+              }
+            },
+          ),
+          SettingsRow(
+            icon: Icons.fingerprint_outlined,
+            title: 'App lock',
+            subtitle: appLockEnabled ? 'Biometric required' : 'Off',
+            trailing: Switch(
+              value: appLockEnabled,
+              onChanged: (value) async {
+                if (value) {
+                  final supported =
+                      await ref.read(appLockServiceProvider).isDeviceSupported();
+                  if (!supported) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Biometric authentication is not available.'),
+                      ),
+                    );
+                    return;
+                  }
+                  final ok = await ref.read(appLockServiceProvider).authenticate();
+                  if (!ok) return;
+                }
+                await ref.read(appLockEnabledProvider.notifier).setEnabled(value);
+              },
+            ),
           ),
           const Divider(height: 24),
           const SettingsSection(title: 'PDF'),
@@ -145,6 +199,30 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
           const Divider(height: 24),
+          const SettingsSection(title: 'Pro'),
+          SettingsRow(
+            icon: Icons.workspace_premium_outlined,
+            title: isPro ? 'Pro active' : 'Upgrade to Pro',
+            subtitle: isPro
+                ? 'Ads removed · Unlimited batch processing'
+                : 'Remove ads and unlock unlimited processing',
+            trailing: isPro
+                ? const Icon(Icons.verified_outlined, color: Colors.green, size: 20)
+                : null,
+            onTap: () => context.push('/pro'),
+          ),
+          if (!isPro)
+            SettingsRow(
+              icon: Icons.restore_outlined,
+              title: 'Restore purchases',
+              subtitle: purchaseState.isRestoring
+                  ? 'Restoring...'
+                  : 'Recover Pro on this device',
+              onTap: purchaseState.isRestoring
+                  ? null
+                  : () => ref.read(purchaseUiProvider.notifier).restore(),
+            ),
+          const Divider(height: 24),
           const SettingsSection(title: 'Privacy'),
           SettingsRow(
             icon: Icons.offline_bolt_outlined,
@@ -174,6 +252,41 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.history_outlined,
             title: 'Recent files',
             onTap: () => context.push('/recent-files'),
+          ),
+          SettingsRow(
+            icon: Icons.cached_outlined,
+            title: 'Clear processing cache',
+            subtitle: 'Free space from temp and enhancement files',
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Clear cache?'),
+                  content: const Text(
+                    'This removes temporary and cached enhancement files. '
+                    'Your saved PDFs and images are not deleted.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Clear'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await ref.read(cacheMaintenanceServiceProvider).clearAllCaches();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cache cleared')),
+                  );
+                }
+              }
+            },
           ),
           ListTile(
             leading: const Icon(Icons.cleaning_services_outlined, size: 22),
@@ -223,33 +336,41 @@ class SettingsScreen extends ConsumerWidget {
           SettingsRow(
             icon: Icons.description_outlined,
             title: 'Terms of use',
-            subtitle: 'Offline utility app terms',
-            onTap: () => context.push('/privacy'),
+            subtitle: 'App usage terms',
+            onTap: () => context.push('/terms'),
           ),
           SettingsRow(
             icon: Icons.star_outline,
             title: 'Rate app',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Thank you for using PDF & Image Toolbox!')),
-              );
+            onTap: () async {
+              final uri = Uri.parse(AppConstants.playStoreUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
             },
           ),
           SettingsRow(
             icon: Icons.share_outlined,
             title: 'Share app',
             onTap: () => Share.share(
-              '${AppConstants.appName} — ${AppConstants.appTagline}',
+              AppConstants.appName,
             ),
           ),
           SettingsRow(
             icon: Icons.support_agent_outlined,
             title: 'Contact support',
-            subtitle: AppConstants.companyName,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Support: ${AppConstants.companyName}')),
+            subtitle: AppConstants.supportEmail,
+            onTap: () async {
+              final uri = Uri(
+                scheme: 'mailto',
+                path: AppConstants.supportEmail,
+                queryParameters: {
+                  'subject': '${AppConstants.appName} support',
+                },
               );
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
             },
           ),
           const SizedBox(height: AppSpacing.lg),

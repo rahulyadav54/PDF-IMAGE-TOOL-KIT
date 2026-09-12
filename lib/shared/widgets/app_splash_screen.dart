@@ -76,7 +76,7 @@ class _AppSplashScreenState extends State<AppSplashScreen>
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  AppConstants.appName,
+                  AppConstants.appNameShort,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         color: Colors.white,

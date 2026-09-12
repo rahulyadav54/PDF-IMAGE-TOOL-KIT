@@ -13,6 +13,7 @@ import '../../core/utils/incoming_file_types.dart';
 import '../../shared/models/recent_file.dart';
 
 import '../../shared/providers/recent_files_provider.dart';
+import '../../shared/services/file_organization_service.dart';
 import '../../shared/services/starred_files_service.dart';
 
 import '../../shared/widgets/app_empty_state.dart';
@@ -52,6 +53,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   FileFilter _filter = FileFilter.all;
 
   FileSort _sort = FileSort.newest;
+  String? _folderFilter;
 
 
 
@@ -92,6 +94,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
     final state = ref.watch(recentFilesProvider);
     final starred = ref.watch(starredPathsProvider);
+    final organization = ref.watch(fileOrganizationProvider);
 
 
 
@@ -125,6 +128,11 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
               return false;
 
+            }
+
+            if (_folderFilter != null &&
+                organization.foldersByPath[file.filePath] != _folderFilter) {
+              return false;
             }
 
             return _matchesFilter(file, starred);
@@ -193,6 +201,39 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
                 ),
 
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenH,
+                      AppSpacing.sm,
+                      AppSpacing.screenH,
+                      0,
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('All folders'),
+                            selected: _folderFilter == null,
+                            onSelected: (_) => setState(() => _folderFilter = null),
+                          ),
+                          ...organization.folders.map(
+                            (folder) => Padding(
+                              padding: const EdgeInsets.only(left: AppSpacing.sm),
+                              child: FilterChip(
+                                label: Text(folder),
+                                selected: _folderFilter == folder,
+                                onSelected: (_) =>
+                                    setState(() => _folderFilter = folder),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 SliverToBoxAdapter(
 
                   child: Padding(

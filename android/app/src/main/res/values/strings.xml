@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DocForge</string>
+    <string name="shortcut_scan">Scan document</string>
+    <string name="shortcut_compress">Compress PDF</string>
+    <string name="shortcut_files">Browse files</string>
+</resources>

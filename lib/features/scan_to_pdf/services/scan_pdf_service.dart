@@ -1,14 +1,15 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image/image.dart' as img;
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/utils/filename_generator.dart';
+import '../../../features/image_to_pdf/models/pdf_page_config.dart';
+import '../../../shared/services/document_processing/pdf_page_layout.dart';
 import '../../../shared/services/file_service.dart';
+import '../../image_to_pdf/services/image_to_pdf_isolate.dart';
 
 final scanPdfServiceProvider = Provider<ScanPdfService>((ref) => ScanPdfService(ref));
 
@@ -22,6 +23,7 @@ class ScanPdfService {
     List<String> imagePaths, {
     int maxImageWidth = 1654,
     int jpegQuality = 88,
+    PdfPageConfig config = const PdfPageConfig(),
   }) async {
     if (imagePaths.isEmpty) {
       throw const ProcessingException('Add at least one page before generating a PDF.');
@@ -35,17 +37,18 @@ class ScanPdfService {
         throw const InvalidFileException('A scanned page is no longer available.');
       }
 
-      final bytes = await _preparePageBytes(
-        path,
-        maxImageWidth: maxImageWidth,
-        jpegQuality: jpegQuality,
+      final prepared = await _preparePage(path, maxImageWidth, jpegQuality);
+      final layout = PdfPageLayout.resolve(
+        config: config,
+        imageWidth: prepared.width,
+        imageHeight: prepared.height,
       );
-      final image = pw.MemoryImage(Uint8List.fromList(bytes));
+      final image = pw.MemoryImage(prepared.bytes);
 
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
+          pageFormat: layout.format,
+          margin: layout.margins,
           build: (context) => pw.Center(
             child: pw.Image(image, fit: pw.BoxFit.contain),
           ),
@@ -67,22 +70,20 @@ class ScanPdfService {
     );
   }
 
-  Future<List<int>> _preparePageBytes(
-    String path, {
-    required int maxImageWidth,
-    required int jpegQuality,
-  }) async {
+  Future<PreparedPdfPageData> _preparePage(
+    String path,
+    int maxImageWidth,
+    int jpegQuality,
+  ) async {
     final rawBytes = await File(path).readAsBytes();
-    final decoded = img.decodeImage(rawBytes);
-    if (decoded == null) {
-      throw const InvalidFileException('Unable to process a scanned page.');
-    }
-
-    final resized = decoded.width > maxImageWidth
-        ? img.copyResize(decoded, width: maxImageWidth)
-        : decoded;
-
-    return img.encodeJpg(resized, quality: jpegQuality.clamp(70, 95));
+    return compute(
+      preparePdfPageInIsolate,
+      PreparePdfPageParams(
+        bytes: rawBytes,
+        maxWidth: maxImageWidth,
+        jpegQuality: jpegQuality,
+      ),
+    );
   }
 }
 

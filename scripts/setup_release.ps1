@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-Write-Host "=== PDF & Image Toolbox — Release Setup ===" -ForegroundColor Cyan
+Write-Host "=== DocForge - Release Setup ===" -ForegroundColor Cyan
 
 # 1. Keystore
 $keystorePath = "android/upload-keystore.jks"
@@ -14,7 +14,7 @@ if (-not (Test-Path $keystorePath)) {
         -storepass $keyPass -keypass $keyPass `
         -dname "CN=PDF Image Toolbox, OU=Mobile, O=PDF Toolbox, L=Chennai, ST=Tamil Nadu, C=IN"
     @"
-PDF & Image Toolbox — Upload Keystore Credentials
+DocForge - Upload Keystore Credentials
 =================================================
 KEEP THIS FILE PRIVATE. Back up upload-keystore.jks with these passwords.
 

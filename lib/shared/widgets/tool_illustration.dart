@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../assets/tool_assets.dart';
 import '../models/tool_type.dart';
+import 'tool_icon_badge.dart';
 
-/// Custom tool illustration with Material icon fallback.
+/// Tool icon for [ToolType] screens and cards.
 class ToolIllustration extends StatelessWidget {
   const ToolIllustration({
     super.key,
@@ -18,24 +18,9 @@ class ToolIllustration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final assetPath = ToolAssets.pathFor(tool);
-
     return Semantics(
       label: semanticLabel ?? tool.title,
-      image: true,
-      child: assetPath == null
-          ? Icon(tool.icon, size: size * 0.55, color: tool.accentColor)
-          : Image.asset(
-              assetPath,
-              width: size,
-              height: size,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Icon(
-                tool.icon,
-                size: size * 0.55,
-                color: tool.accentColor,
-              ),
-            ),
+      child: ToolIconBadge(tool: tool, dimension: size),
     );
   }
 }

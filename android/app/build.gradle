@@ -26,6 +26,8 @@ def isValidAdMobAppId = { String id ->
     return id.matches('ca-app-pub-\\d+~\\d+')
 }
 
+def productionAdMobAppId = "ca-app-pub-1411920894777921~1423517984"
+
 def resolveAdMobAppId = { buildTypeDefault ->
     def candidates = []
     if (project.hasProperty('ADMOB_APP_ID') && project.ADMOB_APP_ID) {
@@ -44,7 +46,8 @@ def resolveAdMobAppId = { buildTypeDefault ->
 
 android {
     namespace = "com.pdftoolbox.pdf_image_toolbox"
-    compileSdk = flutter.compileSdkVersion
+    // Play requirement (Sep 2026): target API 36+ for new apps.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -59,7 +62,7 @@ android {
     defaultConfig {
         applicationId = "com.pdftoolbox.pdf_image_toolbox"
         minSdk = 24
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders += [
@@ -89,7 +92,7 @@ android {
                 signingConfig signingConfigs.debug
             }
             manifestPlaceholders += [
-                adMobAppId: resolveAdMobAppId("ca-app-pub-3940256099942544~3347511713")
+                adMobAppId: resolveAdMobAppId(productionAdMobAppId)
             ]
         }
         debug {

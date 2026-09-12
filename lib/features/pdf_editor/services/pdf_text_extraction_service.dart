@@ -5,6 +5,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/editor_models.dart';
+import 'pdf_font_resolver_service.dart';
 
 final pdfTextExtractionServiceProvider =
     Provider<PdfTextExtractionService>((ref) => const PdfTextExtractionService());
@@ -18,6 +19,7 @@ class PdfTextExtractionService {
   List<PdfTextObjectMetadata> extractTextObjects(PdfDocument document) {
     final extractor = PdfTextExtractor(document);
     final lines = extractor.extractTextLines();
+    final resolver = const PdfFontResolverService();
     final objects = <PdfTextObjectMetadata>[];
 
     for (final line in lines) {
@@ -25,6 +27,12 @@ class PdfTextExtractionService {
       if (text.isEmpty) continue;
 
       final styles = line.fontStyle;
+      final resolution = resolver.resolve(
+        document: document,
+        fontName: line.fontName,
+        fontSize: line.fontSize,
+        styles: styles,
+      );
       objects.add(
         PdfTextObjectMetadata(
           id: _uuid.v4(),
@@ -35,13 +43,14 @@ class PdfTextExtractionService {
           fontSize: line.fontSize,
           fontWeight: styles.contains(PdfFontStyle.bold) ? 'bold' : 'normal',
           fontStyle: styles,
-          color: const Color(0xFF000000),
-          characterSpacing: 0,
+          color: _colorFromLine(line),
+          characterSpacing: _characterSpacingFromLine(line),
           lineSpacing: line.fontSize * 0.2,
-          alignment: TextAlign.left,
+          alignment: _alignmentFromLine(line),
           bounds: line.bounds,
           rotation: _rotationFromLine(line),
-          fontPreserved: true,
+          fontPreserved: resolution.preserved,
+          fontNotice: resolution.notice,
         ),
       );
     }
@@ -60,9 +69,16 @@ class PdfTextExtractionService {
     );
     final objects = <PdfTextObjectMetadata>[];
 
+    final resolver = const PdfFontResolverService();
     for (final line in lines) {
       if (line.text.trim().isEmpty) continue;
       final styles = line.fontStyle;
+      final resolution = resolver.resolve(
+        document: document,
+        fontName: line.fontName,
+        fontSize: line.fontSize,
+        styles: styles,
+      );
       objects.add(
         PdfTextObjectMetadata(
           id: _uuid.v4(),
@@ -73,13 +89,14 @@ class PdfTextExtractionService {
           fontSize: line.fontSize,
           fontWeight: styles.contains(PdfFontStyle.bold) ? 'bold' : 'normal',
           fontStyle: styles,
-          color: const Color(0xFF000000),
-          characterSpacing: 0,
+          color: _colorFromLine(line),
+          characterSpacing: _characterSpacingFromLine(line),
           lineSpacing: line.fontSize * 0.2,
-          alignment: TextAlign.left,
+          alignment: _alignmentFromLine(line),
           bounds: line.bounds,
           rotation: _rotationFromLine(line),
-          fontPreserved: true,
+          fontPreserved: resolution.preserved,
+          fontNotice: resolution.notice,
         ),
       );
     }
@@ -133,5 +150,40 @@ class PdfTextExtractionService {
       return 90;
     }
     return 0;
+  }
+
+  Color _colorFromLine(TextLine line) {
+    // Syncfusion TextGlyph does not expose fill color in Flutter PDF API.
+    return const Color(0xFF000000);
+  }
+
+  double _characterSpacingFromLine(TextLine line) {
+    if (line.wordCollection.isEmpty) return 0;
+    final word = line.wordCollection.first;
+    if (word.glyphs.length < 2) return 0;
+    final first = word.glyphs.first.bounds;
+    final second = word.glyphs[1].bounds;
+    final gap = second.left - first.right;
+    if (gap > 0 && gap < line.fontSize) return gap;
+    return 0;
+  }
+
+  TextAlign _alignmentFromLine(TextLine line) {
+    final width = line.bounds.width;
+    if (width <= 0 || line.wordCollection.isEmpty) return TextAlign.left;
+
+    final words = line.wordCollection;
+    final firstLeft = words.first.bounds.left;
+    final lastRight = words.last.bounds.right;
+    final contentWidth = lastRight - firstLeft;
+    final leftPad = firstLeft - line.bounds.left;
+    final rightPad = line.bounds.right - lastRight;
+
+    if (contentWidth >= width * 0.9) return TextAlign.justify;
+    if (leftPad > width * 0.25 && rightPad > width * 0.25) {
+      return TextAlign.center;
+    }
+    if (rightPad > leftPad * 2) return TextAlign.right;
+    return TextAlign.left;
   }
 }

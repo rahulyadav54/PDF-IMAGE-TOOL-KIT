@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/models/tool_catalog.dart';
 import '../../../shared/models/tool_type.dart';
 import '../../../shared/widgets/tool_card.dart';
 
@@ -33,7 +34,7 @@ class ToolsGrid extends StatelessWidget {
           itemBuilder: (context, index) {
             final tool = tools[index];
             return ToolCard(
-              tool: tool,
+              entry: ToolCatalog.fromTool(tool),
               onTap: () => context.push(tool.route),
             );
           },

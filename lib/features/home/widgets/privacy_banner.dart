@@ -26,7 +26,7 @@ class PrivacyBanner extends StatelessWidget {
           Text('Your files. Your device.', style: AppTypography.bannerTitle(context)),
           const SizedBox(height: 4),
           Text(
-            'Powerful PDF & image tools that work offline.',
+            'Professional PDF editor and tools that work offline.',
             style: AppTypography.caption(context),
           ),
           const SizedBox(height: 12),

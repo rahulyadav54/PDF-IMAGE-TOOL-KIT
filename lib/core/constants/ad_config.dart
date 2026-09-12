@@ -2,5 +2,5 @@
 class AdConfig {
   AdConfig._();
 
-  static const bool enabled = false;
+  static const bool enabled = true;
 }

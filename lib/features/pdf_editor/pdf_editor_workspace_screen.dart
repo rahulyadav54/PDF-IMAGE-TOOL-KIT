@@ -27,7 +27,9 @@ import 'widgets/pdf_page_thumbnail_strip.dart';
 import 'widgets/signature_sheet.dart';
 
 class PdfEditorWorkspaceScreen extends ConsumerStatefulWidget {
-  const PdfEditorWorkspaceScreen({super.key});
+  const PdfEditorWorkspaceScreen({super.key, this.signOnlyMode = false});
+
+  final bool signOnlyMode;
 
   @override
   ConsumerState<PdfEditorWorkspaceScreen> createState() =>
@@ -112,7 +114,7 @@ class _PdfEditorWorkspaceScreenState
           backgroundColor: AppColors.backgroundLight,
           appBar: AppBar(
             title: Text(
-              session.fileName,
+              widget.signOnlyMode ? 'Sign PDF' : session.fileName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -232,14 +234,27 @@ class _PdfEditorWorkspaceScreenState
                 },
                 onAddPage: notifier.addBlankPage,
               ),
-              PdfEditorToolbar(
-                activeTool: session.activeTool,
-                canUndo: notifier.canUndo,
-                canRedo: notifier.canRedo,
-                onUndo: notifier.undo,
-                onRedo: notifier.redo,
-                onToolSelected: notifier.setTool,
-              ),
+              if (widget.signOnlyMode)
+                Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Text(
+                      'Tap on the page to place your signature, then tap Export to share.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              else
+                PdfEditorToolbar(
+                  activeTool: session.activeTool,
+                  canUndo: notifier.canUndo,
+                  canRedo: notifier.canRedo,
+                  onUndo: notifier.undo,
+                  onRedo: notifier.redo,
+                  onToolSelected: notifier.setTool,
+                ),
             ],
           ),
         ),

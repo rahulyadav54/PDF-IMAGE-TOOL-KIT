@@ -84,6 +84,16 @@ class ScanSessionNotifier extends StateNotifier<List<ScanPage>> {
     state = state.where((p) => p.id != id).toList();
   }
 
+  Future<void> removeLastPages(int count) async {
+    if (count <= 0 || state.isEmpty) return;
+    final removeCount = count.clamp(1, state.length);
+    final toRemove = state.sublist(state.length - removeCount);
+    for (final page in toRemove) {
+      await _deletePageFiles(page);
+    }
+    state = state.sublist(0, state.length - removeCount);
+  }
+
   void reorder(int oldIndex, int newIndex) {
     final pages = [...state];
     if (newIndex > oldIndex) newIndex -= 1;

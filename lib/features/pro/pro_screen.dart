@@ -48,7 +48,7 @@ class _ProScreenState extends ConsumerState<ProScreen> {
           Icon(Icons.workspace_premium, size: 64, color: colors.tertiary),
           const SizedBox(height: 16),
           Text(
-            'PDF & Image Toolbox Pro',
+            'DocForge Pro',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),

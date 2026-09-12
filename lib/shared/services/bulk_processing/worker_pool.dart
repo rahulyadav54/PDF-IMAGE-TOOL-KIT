@@ -22,6 +22,14 @@ class WorkerPool {
     return base;
   }
 
+  /// Image decode/enhance is memory-heavy — keep concurrency low.
+  static int recommendedImageConcurrency({int? itemCount}) {
+    final cpus = Platform.numberOfProcessors;
+    final base = cpus <= 2 ? 1 : 2;
+    if (itemCount != null && itemCount < base) return math.max(1, itemCount);
+    return base;
+  }
+
   /// Processes [items] in batches of [concurrency] workers.
   static Future<List<R>> mapConcurrent<T, R>({
     required List<T> items,

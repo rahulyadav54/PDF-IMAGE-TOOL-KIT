@@ -28,6 +28,7 @@ abstract final class ToolAssets {
   static const settings = '$_base/settings.png';
   static const recentFiles = '$_base/recent_files.png';
   static const privacy = '$_base/privacy_security.png';
+  static const upgradePro = '$_base/batch_processing.png';
 
   static const Map<ToolType, String> _map = {
     ToolType.scanToPdf: '$_base/scan_to_pdf.png',

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/services/temp_file_service.dart';
@@ -10,6 +11,8 @@ import '../../../shared/widgets/loading_overlay.dart';
 import '../models/scan_enhance_kind.dart';
 import '../models/scan_page.dart';
 import '../services/image_enhancement_service.dart';
+import '../services/scan_quality_service.dart';
+import 'scan_quality_card.dart';
 
 class PageEditorSheet extends ConsumerStatefulWidget {
   const PageEditorSheet({
@@ -31,6 +34,8 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
   late double _contrast;
   String? _previewPath;
   bool _isProcessing = false;
+  ScanQualityReport? _quality;
+  bool _qualityLoading = true;
 
   @override
   void initState() {
@@ -40,10 +45,27 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
     _contrast = widget.page.contrast;
     _previewPath = widget.page.displayImagePath;
 
-    if (_enhanceKind == ScanEnhanceKind.original) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadQuality();
+      if (_enhanceKind == ScanEnhanceKind.original) {
         _applyPreset(ScanEnhancementPreset.magicColor);
-      });
+      }
+    });
+  }
+
+  Future<void> _loadQuality() async {
+    try {
+      final report = await ref
+          .read(scanQualityServiceProvider)
+          .analyze(widget.page.originalImagePath);
+      if (mounted) {
+        setState(() {
+          _quality = report;
+          _qualityLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _qualityLoading = false);
     }
   }
 
@@ -56,7 +78,7 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
         kind: _enhanceKind,
         brightness: _brightness,
         contrast: _contrast,
-        maxDimension: 640,
+        maxDimension: AppConstants.enhancementPreviewMaxDimension,
         jpegQuality: 78,
         preview: true,
         useCache: false,
@@ -169,6 +191,14 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
                     ),
               ),
               const SizedBox(height: 12),
+              if (_quality != null) ...[
+                ScanQualityCard(report: _quality!),
+                const SizedBox(height: 12),
+              ] else if (_qualityLoading)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator(),
+                ),
               SizedBox(
                 height: 40,
                 child: ListView.separated(

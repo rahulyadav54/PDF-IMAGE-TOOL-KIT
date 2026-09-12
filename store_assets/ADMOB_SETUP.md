@@ -1,4 +1,4 @@
-# AdMob Setup Guide — PDF & Image Toolbox
+# AdMob Setup Guide — DocForge
 
 Follow these steps in order. The app code is already wired; you only need AdMob console IDs.
 
@@ -17,7 +17,7 @@ Follow these steps in order. The app code is already wired; you only need AdMob 
 1. In AdMob, click **Apps** → **Add app**
 2. Choose **No** when asked if the app is on a store (or **Yes** if already published)
 3. Platform: **Android**
-4. App name: `PDF & Image Toolbox`
+4. App name: `DocForge — PDF Editor & Tools`
 5. Package name (must match exactly):
 
    ```

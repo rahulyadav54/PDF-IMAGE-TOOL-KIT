@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/errors/app_exception.dart';
+import '../../core/utils/progress_throttle.dart';
 import '../../shared/providers/app_preferences_provider.dart';
 import '../../shared/providers/recent_files_provider.dart';
 import '../../shared/utils/workflow_presets.dart';
@@ -15,7 +17,7 @@ import '../../shared/services/file_service.dart';
 import '../../shared/services/recent_files_service.dart';
 import '../../shared/services/thumbnail_service.dart';
 import '../../shared/models/tool_type.dart';
-import '../../shared/widgets/bulk_processing_overlay.dart';
+import '../../shared/widgets/processing_job_overlay.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/tool_app_bar_title.dart';
 import '../../shared/widgets/empty_state_card.dart';
@@ -28,7 +30,7 @@ import 'providers/image_to_pdf_session_provider.dart';
 import 'services/image_to_pdf_orchestrator.dart';
 import 'widgets/image_pages_list.dart';
 import 'widgets/image_pdf_config_panel.dart';
-import 'widgets/image_preview_dialog.dart';
+import 'widgets/image_enhancement_preview_dialog.dart';
 import 'widgets/page_config_panel.dart';
 
 class ImageToPdfScreen extends ConsumerStatefulWidget {
@@ -50,7 +52,9 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
   String _stage = '';
   int _progressCurrent = 0;
   int _progressTotal = 0;
+  int _progressFailed = 0;
   String? _progressDetail;
+  final _progressThrottle = ProgressThrottle();
 
   @override
   void initState() {
@@ -104,8 +108,23 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
       }
 
       final before = ref.read(imageToPdfSessionProvider).images.length;
-      ref.read(imageToPdfSessionProvider.notifier).addImages(newItems);
+      final remaining = AppConstants.maxImageToPdfBatch - before;
+      if (remaining <= 0) {
+        _showMessage(
+          'Maximum ${AppConstants.maxImageToPdfBatch} images per PDF.',
+        );
+        return;
+      }
+
+      final limitedItems = newItems.take(remaining).toList();
+      ref.read(imageToPdfSessionProvider.notifier).addImages(limitedItems);
       final after = ref.read(imageToPdfSessionProvider).images.length;
+
+      if (newItems.length > remaining) {
+        _showMessage(
+          'Added $remaining images (limit ${AppConstants.maxImageToPdfBatch} per PDF).',
+        );
+      }
 
       if (after == before && newItems.isNotEmpty) {
         _showMessage('Selected images are already in the list.');
@@ -171,6 +190,7 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
       _progressCurrent = 0;
       _progressTotal = session.images.length;
       _progressDetail = null;
+      _progressFailed = 0;
     });
 
     try {
@@ -195,14 +215,21 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
           detail,
         }) {
           if (!mounted) return;
-          setState(() {
-            _stage = stage;
-            _progressCurrent = current;
-            _progressTotal = total;
-            _progressDetail = detail;
+          _progressThrottle.call(() {
+            if (!mounted) return;
+            setState(() {
+              _stage = stage;
+              _progressCurrent = current;
+              _progressTotal = total;
+              _progressDetail = detail;
+            });
           });
         },
       );
+
+      if (result.failedItems.isNotEmpty && mounted) {
+        setState(() => _progressFailed = result.failedItems.length);
+      }
 
       await ref.read(entitlementServiceProvider).recordOperation();
 
@@ -258,6 +285,12 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _progressThrottle.dispose();
+    super.dispose();
   }
 
   @override
@@ -323,15 +356,20 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
                     message: 'Tap below to select images from your device.',
                   )
                 else ...[
-                  ImagePagesList(
-                    images: session.images,
-                    onReorder: notifier.reorder,
-                    onPreview: (image) =>
-                        ImagePreviewDialog.show(context, image),
-                    onRemove: (image) => notifier.remove(image.id),
-                    showEnhanceToggle: showEnhanceSelected,
-                    onToggleEnhance: (image, selected) =>
-                        notifier.toggleEnhancementSelection(image.id, selected),
+                  RepaintBoundary(
+                    child: ImagePagesList(
+                      images: session.images,
+                      onReorder: notifier.reorder,
+                      onPreview: (image) =>
+                          ImageEnhancementPreviewDialog.show(context, image),
+                      onRemove: (image) => notifier.remove(image.id),
+                      showEnhanceToggle: showEnhanceSelected,
+                      onToggleEnhance: (image, selected) =>
+                          notifier.toggleEnhancementSelection(
+                            image.id,
+                            selected,
+                          ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   ImagePdfConfigPanel(
@@ -370,18 +408,16 @@ class _ImageToPdfScreenState extends ConsumerState<ImageToPdfScreen> {
         ),
         if (_isLoading) const LoadingOverlay(message: 'Importing images...'),
         if (_isProcessing)
-          BulkProcessingOverlay(
-            title: _stage == 'enhance' ? 'Enhancing images' : 'Creating your PDF',
-            message: _stage == 'enhance'
-                ? 'Improving text clarity...'
-                : 'Creating PDF...',
-            progress: _progressTotal > 0
-                ? _progressCurrent / _progressTotal
-                : null,
-            progressLabel: _progressTotal > 0
-                ? '${_progressCurrent} / $_progressTotal'
-                : null,
-            detail: _progressDetail,
+          ProcessingJobOverlay(
+            title: _stage == 'prepare'
+                ? 'Preparing images'
+                : _stage == 'enhance'
+                ? 'Enhancing images'
+                : 'Creating your PDF',
+            completed: _progressCurrent,
+            total: _progressTotal,
+            failed: _progressFailed,
+            currentLabel: _progressDetail,
             onCancel: _confirmCancel,
           ),
       ],

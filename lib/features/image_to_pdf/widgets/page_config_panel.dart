@@ -14,7 +14,8 @@ class PageConfigPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showOrientation = config.pageSize != PdfPageSizeOption.fitToImage;
+    final showOrientation = config.pageSize != PdfPageSizeOption.fitToImage &&
+        config.pageSize != PdfPageSizeOption.auto;
 
     return Card(
       child: Padding(
@@ -68,7 +69,9 @@ class PageConfigPanel extends StatelessWidget {
             ],
             const SizedBox(height: 8),
             Text(
-              config.pageSize.description,
+              config.pageSize == PdfPageSizeOption.auto
+                  ? 'Each page uses the best paper size, orientation, and margins.'
+                  : config.pageSize.description,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

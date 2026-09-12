@@ -5,9 +5,10 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../shared/models/tool_catalog.dart';
 import '../../shared/widgets/app_search_field.dart';
-import '../../shared/widgets/catalog_tool_icon.dart';
+import '../../shared/widgets/responsive_tool_grid.dart';
 import '../../shared/widgets/section_header.dart';
-import 'widgets/tools_horizontal_row.dart';
+import '../../shared/widgets/tool_card.dart';
+import 'widgets/tool_list_tile.dart';
 
 class ToolsHubScreen extends StatefulWidget {
   const ToolsHubScreen({super.key});
@@ -35,19 +36,61 @@ class _ToolsHubScreenState extends State<ToolsHubScreen> {
 
   void _openTool(ToolCatalogEntry entry) => context.push(entry.route);
 
+  List<Widget> _categorySection(String title, List<ToolCatalogEntry> entries) {
+    if (entries.isEmpty) return const [];
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
+        sliver: SliverToBoxAdapter(child: SectionHeader(title: title)),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final entry = entries[index];
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: index < entries.length - 1 ? AppSpacing.sm : 0,
+                ),
+                child: ToolListTile(
+                  entry: entry,
+                  onTap: () => _openTool(entry),
+                ),
+              );
+            },
+            childCount: entries.length,
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSearching = _query.isNotEmpty;
     final searchResults =
         isSearching ? ToolCatalog.search(_query) : const <ToolCatalogEntry>[];
-    final pdf = isSearching ? const <ToolCatalogEntry>[] : _filter(ToolCatalog.pdfTools);
+    final scan = isSearching ? const <ToolCatalogEntry>[] : _filter(ToolCatalog.scanTools);
+    final pdf = isSearching
+        ? const <ToolCatalogEntry>[]
+        : _filter(
+            ToolCatalog.pdfTools
+                .where((e) => e.route != ToolCatalog.scanTools.first.route)
+                .toList(),
+          );
     final image =
         isSearching ? const <ToolCatalogEntry>[] : _filter(ToolCatalog.imageTools);
-    final other =
-        isSearching ? const <ToolCatalogEntry>[] : _filter(ToolCatalog.otherTools);
+    final document =
+        isSearching ? const <ToolCatalogEntry>[] : _filter(ToolCatalog.documentTools);
     final hasResults = isSearching
         ? searchResults.isNotEmpty
-        : pdf.isNotEmpty || image.isNotEmpty || other.isNotEmpty;
+        : scan.isNotEmpty ||
+            pdf.isNotEmpty ||
+            image.isNotEmpty ||
+            document.isNotEmpty;
 
     return SafeArea(
       child: CustomScrollView(
@@ -57,9 +100,9 @@ class _ToolsHubScreenState extends State<ToolsHubScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenH,
-                AppSpacing.sm,
-                AppSpacing.screenH,
                 AppSpacing.md,
+                AppSpacing.screenH,
+                AppSpacing.sm,
               ),
               child: Text('Tools', style: AppTypography.screenTitle(context)),
             ),
@@ -69,7 +112,7 @@ class _ToolsHubScreenState extends State<ToolsHubScreen> {
             sliver: SliverToBoxAdapter(
               child: AppSearchField(
                 controller: _searchController,
-                hintText: 'Search tools (e.g. edit, compress, scan)',
+                hintText: 'Search tools...',
                 onChanged: _onQueryChanged,
               ),
             ),
@@ -106,7 +149,9 @@ class _ToolsHubScreenState extends State<ToolsHubScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        'No tools match "$_query"',
+                        isSearching
+                            ? 'No tools match "$_query"'
+                            : 'No tools available',
                         textAlign: TextAlign.center,
                         style: AppTypography.caption(context),
                       ),
@@ -119,16 +164,11 @@ class _ToolsHubScreenState extends State<ToolsHubScreen> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: AppSpacing.md,
-                  crossAxisSpacing: AppSpacing.md,
-                  childAspectRatio: 0.82,
-                ),
+                gridDelegate: ResponsiveToolGrid.sliverDelegate(context),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final entry = searchResults[index];
-                    return _SearchToolTile(
+                    return ToolCard(
                       entry: entry,
                       onTap: () => _openTool(entry),
                     );
@@ -138,96 +178,13 @@ class _ToolsHubScreenState extends State<ToolsHubScreen> {
               ),
             )
           else ...[
-            if (pdf.isNotEmpty) ...[
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
-                sliver: SliverToBoxAdapter(child: SectionHeader(title: 'PDF')),
-              ),
-              SliverToBoxAdapter(
-                child: ToolsHorizontalRow(
-                  entries: pdf,
-                  onTap: _openTool,
-                ),
-              ),
-            ],
-            if (image.isNotEmpty) ...[
-              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
-                sliver: SliverToBoxAdapter(child: SectionHeader(title: 'Image')),
-              ),
-              SliverToBoxAdapter(
-                child: ToolsHorizontalRow(
-                  entries: image,
-                  onTap: _openTool,
-                ),
-              ),
-            ],
-            if (other.isNotEmpty) ...[
-              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
-                sliver: SliverToBoxAdapter(child: SectionHeader(title: 'More')),
-              ),
-              SliverToBoxAdapter(
-                child: ToolsHorizontalRow(
-                  entries: other,
-                  onTap: _openTool,
-                ),
-              ),
-            ],
+            ..._categorySection('Scan', scan),
+            ..._categorySection('PDF', pdf),
+            ..._categorySection('Image', image),
+            ..._categorySection('Document', document),
           ],
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xxl)),
         ],
-      ),
-    );
-  }
-}
-
-class _SearchToolTile extends StatelessWidget {
-  const _SearchToolTile({
-    required this.entry,
-    required this.onTap,
-  });
-
-  final ToolCatalogEntry entry;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Semantics(
-      button: true,
-      label: entry.title,
-      child: Material(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: colors.outlineVariant),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CatalogToolIcon(entry: entry, size: 64),
-                const SizedBox(height: 8),
-                Text(
-                  entry.title,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.cardTitle(context).copyWith(fontSize: 11),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

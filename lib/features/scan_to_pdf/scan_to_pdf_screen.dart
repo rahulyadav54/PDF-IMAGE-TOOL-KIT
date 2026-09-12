@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/errors/app_exception.dart';
+import '../../core/utils/progress_throttle.dart';
 import '../../shared/services/bulk_processing/cancel_token.dart'
     show BulkCancelledException, CancelToken;
-import '../../shared/widgets/bulk_processing_overlay.dart';
+import '../../shared/widgets/processing_job_overlay.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -19,23 +20,50 @@ import '../../shared/widgets/result_screen.dart';
 import 'models/scan_page.dart';
 import 'providers/scan_session_provider.dart';
 import 'services/document_scanner_service.dart';
+import 'services/image_enhancement_service.dart';
 import 'services/scan_pdf_service.dart';
+import 'services/scan_quality_service.dart';
+import 'models/scan_mode.dart';
 import 'widgets/page_editor_sheet.dart';
 import 'widgets/scan_pages_list.dart';
+import 'widgets/scan_quality_review_sheet.dart';
 
 class ScanToPdfScreen extends ConsumerStatefulWidget {
-  const ScanToPdfScreen({super.key});
+  const ScanToPdfScreen({super.key, this.initialMode});
+
+  final ScanMode? initialMode;
 
   @override
   ConsumerState<ScanToPdfScreen> createState() => _ScanToPdfScreenState();
 }
 
 class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
+  late ScanMode _scanMode;
   bool _isBusy = false;
   String? _busyMessage;
   CancelToken? _cancelToken;
   int _enhanceCurrent = 0;
   int _enhanceTotal = 0;
+  final _progressThrottle = ProgressThrottle();
+
+  @override
+  void initState() {
+    super.initState();
+    _scanMode = widget.initialMode ?? ScanMode.document;
+  }
+
+  ScanEnhancementPreset _presetForMode() {
+    switch (_scanMode) {
+      case ScanMode.receipt:
+        return ScanEnhancementPreset.blackAndWhite;
+      case ScanMode.book:
+        return ScanEnhancementPreset.magicColor;
+      case ScanMode.idCard:
+        return ScanEnhancementPreset.document;
+      case ScanMode.document:
+        return ScanEnhancementPreset.magicColor;
+    }
+  }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -43,6 +71,12 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
 
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  void dispose() {
+    _progressThrottle.dispose();
+    super.dispose();
   }
 
   Future<void> _runBusy(String message, Future<void> Function() action) async {
@@ -66,28 +100,65 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     }
   }
 
+  Future<void> _reviewNewPages(List<String> paths, int startIndex) async {
+    if (paths.isEmpty || !mounted) return;
+
+    final qualityService = ref.read(scanQualityServiceProvider);
+    for (var i = 0; i < paths.length; i++) {
+      if (!mounted) return;
+      final report = await qualityService.analyze(paths[i]);
+      if (!mounted) return;
+
+      if (report.score < 70 || report.shouldRetake) {
+        final keep = await ScanQualityReviewSheet.show(
+          context,
+          report: report,
+          pageLabel: paths.length == 1
+              ? 'Scan quality'
+              : 'Page ${i + 1} of ${paths.length}',
+        );
+        if (!keep && mounted) {
+          final pages = ref.read(scanSessionProvider);
+          final pageIndex = startIndex + i;
+          if (pageIndex < pages.length) {
+            await ref
+                .read(scanSessionProvider.notifier)
+                .removePage(pages[pageIndex].id);
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _addPagesWithQualityReview(List<String> paths) async {
+    if (paths.isEmpty) return;
+    final startIndex = ref.read(scanSessionProvider).length;
+    ref.read(scanSessionProvider.notifier).addPages(paths);
+    await _reviewNewPages(paths, startIndex);
+  }
+
   Future<void> _addMultipleFromScanner() async {
+    var paths = <String>[];
     await _runBusy('Opening scanner...', () async {
-      final paths = await ref.read(documentScannerServiceProvider).scanMultiplePages();
-      if (paths.isEmpty) return;
-      ref.read(scanSessionProvider.notifier).addPages(paths);
+      paths = await ref.read(documentScannerServiceProvider).scanMultiplePages();
     });
+    if (paths.isNotEmpty) await _addPagesWithQualityReview(paths);
   }
 
   Future<void> _addFromGallery() async {
+    var paths = <String>[];
     await _runBusy('Opening gallery...', () async {
-      final paths = await ref.read(documentScannerServiceProvider).pickFromGalleryScanner();
-      if (paths.isEmpty) return;
-      ref.read(scanSessionProvider.notifier).addPages(paths);
+      paths = await ref.read(documentScannerServiceProvider).pickFromGalleryScanner();
     });
+    if (paths.isNotEmpty) await _addPagesWithQualityReview(paths);
   }
 
   Future<void> _addFromFiles() async {
+    var paths = <String>[];
     await _runBusy('Selecting images...', () async {
-      final paths = await ref.read(documentScannerServiceProvider).pickImagesFromFiles();
-      if (paths.isEmpty) return;
-      ref.read(scanSessionProvider.notifier).addPages(paths);
+      paths = await ref.read(documentScannerServiceProvider).pickImagesFromFiles();
     });
+    if (paths.isNotEmpty) await _addPagesWithQualityReview(paths);
   }
 
   Future<void> _enhanceAllPages() async {
@@ -104,13 +175,16 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
 
     try {
       await ref.read(scanSessionProvider.notifier).enhanceAllPages(
+        preset: _presetForMode(),
         onProgress: (current, total) {
-          if (mounted) {
+          if (!mounted) return;
+          _progressThrottle.call(() {
+            if (!mounted) return;
             setState(() {
               _enhanceCurrent = current;
               _enhanceTotal = total;
             });
-          }
+          });
         },
         cancelToken: _cancelToken,
       );
@@ -230,6 +304,39 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
           body: SafeArea(
             child: Column(
               children: [
+                SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenH),
+                    itemCount: ScanMode.values.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                    itemBuilder: (context, index) {
+                      final mode = ScanMode.values[index];
+                      final selected = _scanMode == mode;
+                      return ChoiceChip(
+                        label: Text(mode.label),
+                        selected: selected,
+                        onSelected: _isBusy
+                            ? null
+                            : (_) => setState(() => _scanMode = mode),
+                      );
+                    },
+                  ),
+                ),
+                if (pages.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenH,
+                      AppSpacing.sm,
+                      AppSpacing.screenH,
+                      0,
+                    ),
+                    child: Text(
+                      _scanMode.description,
+                      style: AppTypography.cardSubtitle(context),
+                    ),
+                  ),
                 Expanded(
                   child: pages.isEmpty
                       ? _ScannerHero(onScan: _isBusy ? null : _addMultipleFromScanner)
@@ -241,13 +348,17 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
                               style: AppTypography.sectionTitle(context),
                             ),
                             const SizedBox(height: AppSpacing.md),
-                            ScanPagesList(
-                              pages: pages,
-                              onReorder: (old, newIndex) =>
-                                  ref.read(scanSessionProvider.notifier).reorder(old, newIndex),
-                              onTap: _openEditor,
-                              onRemove: (page) =>
-                                  ref.read(scanSessionProvider.notifier).removePage(page.id),
+                            RepaintBoundary(
+                              child: ScanPagesList(
+                                pages: pages,
+                                onReorder: (old, newIndex) => ref
+                                    .read(scanSessionProvider.notifier)
+                                    .reorder(old, newIndex),
+                                onTap: _openEditor,
+                                onRemove: (page) => ref
+                                    .read(scanSessionProvider.notifier)
+                                    .removePage(page.id),
+                              ),
                             ),
                           ],
                         ),
@@ -312,12 +423,11 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
           ),
         ),
         if (_isBusy && _busyMessage != null && _enhanceTotal > 0)
-          BulkProcessingOverlay(
+          ProcessingJobOverlay(
             title: 'Enhancing images',
-            message: _busyMessage!,
-            progress: _enhanceTotal > 0 ? _enhanceCurrent / _enhanceTotal : null,
-            progressLabel: '$_enhanceCurrent / $_enhanceTotal images',
-            detail: 'Improving text clarity...',
+            completed: _enhanceCurrent,
+            total: _enhanceTotal,
+            currentLabel: _busyMessage,
             onCancel: _confirmCancelEnhance,
           )
         else if (_isBusy && _busyMessage != null)

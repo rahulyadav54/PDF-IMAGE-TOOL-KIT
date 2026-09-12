@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../assets/tool_assets.dart';
 import '../models/tool_catalog.dart';
+import 'tool_icon_badge.dart';
 
-/// Custom tool icon from assets with Material icon fallback.
+/// Tool icon for catalog entries — vector badge (no PNG black-box artifacts).
 class CatalogToolIcon extends StatelessWidget {
   const CatalogToolIcon({
     super.key,
@@ -16,22 +16,14 @@ class CatalogToolIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final assetPath = ToolAssets.pathForEntry(entry);
-
-    if (assetPath == null) {
-      return Icon(entry.icon, size: size * 0.55, color: entry.color);
+    if (entry.tool != null) {
+      return ToolIconBadge(tool: entry.tool!, dimension: size);
     }
 
-    return Image.asset(
-      assetPath,
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => Icon(
-        entry.icon,
-        size: size * 0.55,
-        color: entry.color,
-      ),
+    return ToolIconBadge(
+      icon: entry.icon,
+      accentColor: entry.color,
+      dimension: size,
     );
   }
 }

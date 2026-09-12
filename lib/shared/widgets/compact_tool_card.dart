@@ -37,18 +37,11 @@ class CompactToolCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CatalogToolIcon(entry: entry, size: 56),
+                CatalogToolIcon(entry: entry, size: 44),
                 const Spacer(),
                 Text(
                   entry.title,
                   style: AppTypography.cardTitle(context),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  entry.subtitle,
-                  style: AppTypography.cardSubtitle(context),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -83,7 +76,7 @@ class HorizontalToolChip extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Container(
-            width: 148,
+            width: 132,
             decoration: BoxDecoration(
               border: Border.all(
                 color: Theme.of(context).colorScheme.outlineVariant,
@@ -93,8 +86,9 @@ class HorizontalToolChip extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                CatalogToolIcon(entry: entry, size: 40),
+                CatalogToolIcon(entry: entry, size: 36),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   entry.title,

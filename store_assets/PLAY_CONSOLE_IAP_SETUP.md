@@ -11,7 +11,7 @@ Create these products **before** testing real purchases.
 |-------|-------|
 | Product ID | `pdf_toolbox_pro_lifetime` |
 | Type | One-time product (non-consumable) |
-| Name | PDF Toolbox Pro — Lifetime |
+| Name | DocForge Pro — Lifetime |
 | Description | Remove ads, unlimited daily operations, and unlimited batch processing forever. |
 | Suggested price | ₹299–₹499 (adjust for your market) |
 
@@ -22,7 +22,7 @@ Create these products **before** testing real purchases.
 | Product ID | `pdf_toolbox_pro_monthly` |
 | Type | Subscription |
 | Base plan ID | `monthly` (or default) |
-| Name | PDF Toolbox Pro — Monthly |
+| Name | DocForge Pro — Monthly |
 | Description | Remove ads and unlock unlimited operations. Renews monthly. |
 | Suggested price | ₹49–₹99/month |
 

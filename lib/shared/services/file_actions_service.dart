@@ -80,7 +80,7 @@ class FileActionsService {
     );
   }
 
-  /// Copies a file to the public Downloads/PDF Image Toolbox folder.
+  /// Copies a file to the public Downloads/DocForge folder.
   Future<FileSaveResult> saveToDownloads(String path) async {
     await _validatePath(path);
 
@@ -89,7 +89,7 @@ class FileActionsService {
       throw const StorageException('Downloads folder is not available on this device.');
     }
 
-    final outputFolder = Directory(p.join(downloadsDir.path, 'PDF Image Toolbox'));
+    final outputFolder = Directory(p.join(downloadsDir.path, 'DocForge'));
     if (!await outputFolder.exists()) {
       await outputFolder.create(recursive: true);
     }
@@ -117,7 +117,7 @@ class FileActionsService {
 
     return FileSaveResult(
       savedPath: destinationPath,
-      message: '$label saved to Downloads/PDF Image Toolbox',
+      message: '$label saved to Downloads/DocForge',
     );
   }
 

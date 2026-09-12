@@ -66,8 +66,18 @@ class PdfFontResolverService {
     double fontSize,
     List<PdfFontStyle> styles,
   ) {
-    // Embedded font byte extraction is document-specific; standard mapping is used
-    // when the original embedded stream cannot be resolved safely.
+    final normalized = fontName.toLowerCase();
+    if (normalized.contains('times') ||
+        normalized.contains('helvetica') ||
+        normalized.contains('courier') ||
+        normalized.contains('symbol') ||
+        normalized.contains('zapf') ||
+        normalized.contains('arial')) {
+      return null;
+    }
+
+    // Syncfusion Flutter PDF does not expose embedded font byte streams for reuse.
+    // Custom/subset fonts fall back to metrically similar standard fonts.
     return null;
   }
 

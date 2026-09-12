@@ -24,4 +24,4 @@ Use these answers when completing the Data safety section. Adjust if your produc
 Reference the in-app Privacy Policy screen (`/privacy`) or host the same text at a public URL and paste that URL in Play Console.
 
 Suggested statement for the form:
-> PDF & Image Toolbox processes files locally on the device. Recent file history is stored locally and can be cleared by the user. The free version may show Google ads. Purchases are handled by Google Play.
+> DocForge processes files locally on the device. Recent file history is stored locally and can be cleared by the user. The free version may show Google ads. Purchases are handled by Google Play.

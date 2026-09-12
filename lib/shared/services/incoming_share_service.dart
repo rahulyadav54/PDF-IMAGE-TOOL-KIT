@@ -8,6 +8,7 @@ import '../../core/errors/app_exception.dart';
 import '../../core/utils/incoming_file_types.dart';
 import '../models/recent_file.dart';
 import 'file_service.dart';
+import 'open_with_service.dart';
 import 'recent_files_service.dart';
 
 const _operationLabel = 'Opened from another app';
@@ -17,11 +18,13 @@ class IncomingShareOutcome {
     required this.addedCount,
     required this.skippedUnsupported,
     required this.failed,
+    this.importedFiles = const [],
   });
 
   final int addedCount;
   final int skippedUnsupported;
   final int failed;
+  final List<OpenWithFile> importedFiles;
 
   bool get hasAdded => addedCount > 0;
 }
@@ -89,6 +92,7 @@ class IncomingShareService {
     var addedCount = 0;
     var skippedUnsupported = 0;
     var failed = 0;
+    final importedFiles = <OpenWithFile>[];
 
     for (final item in media) {
       if (item.type == SharedMediaType.text || item.type == SharedMediaType.url) {
@@ -113,6 +117,13 @@ class IncomingShareService {
         } else {
           await _recentFilesService.add(recentFile);
           addedCount++;
+          importedFiles.add(
+            OpenWithFile(
+              path: recentFile.filePath,
+              fileName: recentFile.fileName,
+              mimeType: item.mimeType ?? '',
+            ),
+          );
         }
       } on AppException {
         failed++;
@@ -125,6 +136,7 @@ class IncomingShareService {
       addedCount: addedCount,
       skippedUnsupported: skippedUnsupported,
       failed: failed,
+      importedFiles: importedFiles,
     );
   }
 

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_scan"
+        android:shortcutLongLabel="@string/shortcut_scan">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.pdftoolbox.pdf_image_toolbox"
+            android:targetClass="com.pdftoolbox.pdf_image_toolbox.MainActivity">
+            <extra android:name="route" android:value="/scan-to-pdf" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="compress"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_compress"
+        android:shortcutLongLabel="@string/shortcut_compress">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.pdftoolbox.pdf_image_toolbox"
+            android:targetClass="com.pdftoolbox.pdf_image_toolbox.MainActivity">
+            <extra android:name="route" android:value="/compress-pdf" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="recent"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_files"
+        android:shortcutLongLabel="@string/shortcut_files">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.pdftoolbox.pdf_image_toolbox"
+            android:targetClass="com.pdftoolbox.pdf_image_toolbox.MainActivity">
+            <extra android:name="route" android:value="/files" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Premium productivity palette for PDF & Image Toolbox.
+/// Premium productivity palette for DocForge.
 abstract final class AppColors {
   static const deepNavy = Color(0xFF0B1F4D);
   static const electricBlue = Color(0xFF1769FF);
@@ -25,6 +25,7 @@ abstract final class AppColors {
   static const pdfBorder = Color(0xFFBFDBFE);
   static const imageBorder = Color(0xFFBBF7D0);
   static const otherBorder = Color(0xFFDDD6FE);
+  static const proBorder = Color(0xFFC4B5FD);
 
   static Color iconContainerBg(Color accent, {bool dark = false}) =>
       accent.withValues(alpha: dark ? 0.18 : 0.1);

@@ -22,10 +22,14 @@ if (Test-Path $secretsPath) {
 
 $defineArgs = $defines | ForEach-Object { "--dart-define=$_" }
 
-if (-not (Test-Path $secretsPath)) {
-    Write-Warning "android/secrets.local.properties not found — using test AdMob IDs."
-} elseif ($defines.Count -eq 0) {
-    Write-Warning "secrets.local.properties is empty — fill AdMob + Syncfusion keys for production."
+if ($defines.Count -eq 0) {
+    Write-Warning "No AdMob dart-defines found — using Dart productionFallback IDs."
+    $defines = @(
+        "ADMOB_APP_ID=ca-app-pub-1411920894777921~1423517984",
+        "ADMOB_BANNER_ID=ca-app-pub-1411920894777921/6727815552",
+        "ADMOB_INTERSTITIAL_ID=ca-app-pub-1411920894777921/3777007138"
+    )
+    $defineArgs = $defines | ForEach-Object { "--dart-define=$_" }
 }
 
 Write-Host "Running flutter analyze..."

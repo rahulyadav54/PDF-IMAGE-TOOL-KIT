@@ -26,6 +26,22 @@ class ImageEnhanceParams {
 }
 
 /// Runs off the UI thread for faster, non-blocking enhancement.
+class OrientJpegParams {
+  const OrientJpegParams({required this.bytes, required this.quality});
+
+  final Uint8List bytes;
+  final int quality;
+}
+
+Uint8List orientJpegInIsolate(OrientJpegParams params) {
+  final decoded = img.decodeImage(params.bytes);
+  if (decoded == null) return params.bytes;
+  final oriented = img.bakeOrientation(decoded);
+  return Uint8List.fromList(
+    img.encodeJpg(oriented, quality: params.quality.clamp(70, 95)),
+  );
+}
+
 Uint8List enhanceImageInIsolate(ImageEnhanceParams params) {
   final decoded = img.decodeImage(params.bytes);
   if (decoded == null) {
@@ -47,6 +63,11 @@ Uint8List enhanceImageInIsolate(ImageEnhanceParams params) {
     brightness: params.brightness,
     contrast: params.contrast,
   );
+
+  if (mode != ScanEnhanceMode.original &&
+      !DocumentScanEnhancer.isValidEnhancement(decoded, processed)) {
+    processed = img.bakeOrientation(img.Image.from(decoded));
+  }
 
   return Uint8List.fromList(
     img.encodeJpg(processed, quality: params.quality.clamp(70, 95)),

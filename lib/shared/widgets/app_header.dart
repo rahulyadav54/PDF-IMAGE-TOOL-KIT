@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
-import '../../core/utils/date_formatter.dart';
 
 class AppHeader extends StatelessWidget {
   const AppHeader({
     super.key,
-    this.subtitle = 'Everything you need for your files.',
+    this.subtitle = AppConstants.appTagline,
     this.trailing,
-    this.showGreeting = true,
+    this.showAppName = true,
   });
 
   final String subtitle;
   final Widget? trailing;
-  final bool showGreeting;
+  final bool showAppName;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.screenH,
-        AppSpacing.sm,
-        AppSpacing.screenH,
         AppSpacing.md,
+        AppSpacing.screenH,
+        AppSpacing.sm,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,12 +32,15 @@ class AppHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (showGreeting)
+                if (showAppName)
                   Text(
-                    '${DateFormatter.timeOfDayGreeting()} 👋',
-                    style: AppTypography.greeting(context),
+                    AppConstants.appNameShort,
+                    style: AppTypography.caption(context).copyWith(
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
                   ),
-                if (showGreeting) const SizedBox(height: 4),
+                if (showAppName) const SizedBox(height: AppSpacing.xs),
                 Text(subtitle, style: AppTypography.pageTitle(context)),
               ],
             ),

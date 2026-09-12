@@ -10,19 +10,15 @@ void main() {
       img.fill(source, color: img.ColorRgb8(200, 200, 200));
 
       final preset = IdPhotoPreset.presets.first;
-      final targetW = preset.widthPx();
-      final targetH = preset.heightPx();
-      final aspect = targetW / targetH;
+      final targetAspect = preset.widthPx() / preset.heightPx();
 
-      final cropH = source.height;
-      final cropW = (cropH * aspect).round();
-      final maxY = source.height - cropH;
+      final cropWidth = source.width;
+      final cropHeight = (source.width / targetAspect).round();
+      final maxY = source.height - cropHeight;
 
-      final focusHigh = (maxY * 0.2).round();
-      final focusLow = (maxY * 0.6).round();
-
-      expect(focusHigh, lessThan(focusLow));
-      expect(cropW, lessThan(source.width));
+      expect(maxY, greaterThan(0));
+      expect((maxY * 0.2).round(), lessThan((maxY * 0.6).round()));
+      expect(cropHeight, lessThan(source.height));
     });
 
     test('preset dimensions match 300 DPI mm conversion', () {

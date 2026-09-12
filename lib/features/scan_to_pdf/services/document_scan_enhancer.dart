@@ -60,6 +60,18 @@ class DocumentScanEnhancer {
     );
   }
 
+  static bool isValidEnhancement(img.Image before, img.Image after) {
+    final beforeEdges = DocumentImageAnalyzer.analyze(before).edgeDensity;
+    final afterAnalysis = DocumentImageAnalyzer.analyze(after);
+    if (afterAnalysis.meanBrightness > 0.97 || afterAnalysis.meanBrightness < 0.03) {
+      return false;
+    }
+    if (afterAnalysis.edgeDensity < beforeEdges * 0.25) {
+      return false;
+    }
+    return true;
+  }
+
   static img.Image _ensureRgb(img.Image source) {
     if (source.numChannels >= 3) return img.Image.from(source);
     return source.convert(numChannels: 3);

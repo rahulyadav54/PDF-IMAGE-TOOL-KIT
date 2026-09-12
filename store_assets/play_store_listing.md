@@ -3,14 +3,14 @@
 Use this content when creating the store listing in Play Console.
 
 ## App name
-PDF & Image Toolbox
+DocForge — PDF Editor & Tools
 
 ## Short description (max 80 characters)
 Compress, merge, convert PDFs & images offline. Your files stay on your device.
 
 ## Full description
 
-PDF & Image Toolbox is a fast, privacy-focused utility for working with PDFs and images — entirely on your device.
+DocForge — PDF Editor & Tools is a fast, privacy-focused utility for working with PDFs and images — entirely on your device.
 
 **PDF Tools**
 • Compress PDF — reduce file size with quality presets
@@ -66,5 +66,5 @@ Complete the Play Console questionnaire. Expected: Everyone (no mature content).
 | 7-inch tablet | Optional | Same flows on tablet layout |
 
 ## Feature graphic copy suggestion
-**Headline:** PDF & Image Tools — Offline & Private  
+**Headline:** DocForge — PDF Editor & Tools  
 **Subline:** Compress • Merge • Convert • Scan
