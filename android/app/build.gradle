@@ -83,9 +83,9 @@ android {
 
     buildTypes {
         release {
-            // Disabled: R8 was stripping plugin classes and crashing release builds.
-            minifyEnabled false
-            shrinkResources false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             } else {
@@ -105,4 +105,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Ensure Play Console billing requirement (8.0.0+) even if a plugin downgrades transitively.
+    implementation 'com.android.billingclient:billing:8.0.0'
 }
