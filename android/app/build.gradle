@@ -1,0 +1,105 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def secretsProperties = new Properties()
+def secretsFile = rootProject.file('secrets.local.properties')
+if (secretsFile.exists()) {
+    secretsProperties.load(new FileInputStream(secretsFile))
+    secretsProperties.each { key, value ->
+        if (!project.hasProperty(key.toString())) {
+            project.ext.set(key.toString(), value)
+        }
+    }
+}
+
+def isValidAdMobAppId = { String id ->
+    if (id == null || id.isEmpty()) return false
+    return id.matches('ca-app-pub-\\d+~\\d+')
+}
+
+def resolveAdMobAppId = { buildTypeDefault ->
+    def candidates = []
+    if (project.hasProperty('ADMOB_APP_ID') && project.ADMOB_APP_ID) {
+        candidates << project.ADMOB_APP_ID.toString()
+    }
+    if (secretsProperties.containsKey('ADMOB_APP_ID') && secretsProperties['ADMOB_APP_ID']) {
+        candidates << secretsProperties['ADMOB_APP_ID'].toString()
+    }
+    for (def candidate : candidates) {
+        if (isValidAdMobAppId(candidate)) {
+            return candidate
+        }
+    }
+    return buildTypeDefault
+}
+
+android {
+    namespace = "com.pdftoolbox.pdf_image_toolbox"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    defaultConfig {
+        applicationId = "com.pdftoolbox.pdf_image_toolbox"
+        minSdk = 24
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+        manifestPlaceholders += [
+            adMobAppId: "ca-app-pub-3940256099942544~3347511713"
+        ]
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Disabled: R8 was stripping plugin classes and crashing release builds.
+            minifyEnabled false
+            shrinkResources false
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
+            manifestPlaceholders += [
+                adMobAppId: resolveAdMobAppId("ca-app-pub-3940256099942544~3347511713")
+            ]
+        }
+        debug {
+            manifestPlaceholders += [
+                adMobAppId: "ca-app-pub-3940256099942544~3347511713"
+            ]
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}

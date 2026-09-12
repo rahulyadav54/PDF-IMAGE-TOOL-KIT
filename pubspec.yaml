@@ -1,0 +1,76 @@
+name: pdf_image_toolbox
+description: Offline PDF and image utility toolbox for Android.
+publish_to: 'none'
+version: 1.3.5+18
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.6.2
+  shared_preferences: ^2.3.4
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  in_app_purchase_android: ^0.4.0
+  file_picker: ^8.1.6
+  intl: ^0.19.0
+  uuid: ^4.5.1
+  cunning_document_scanner: ^2.8.0
+  permission_handler: ^12.0.3
+  pdf: ^3.11.1
+  image: ^4.3.0
+  share_plus: ^10.1.2
+  open_filex: ^4.5.0
+  gal: ^2.3.2
+  syncfusion_flutter_pdf: ^28.1.33
+  google_mlkit_text_recognition: ^0.14.0
+  printing: ^5.13.4
+  archive: ^4.0.7
+  google_mobile_ads: ^5.3.1
+  in_app_purchase: ^3.2.1
+  package_info_plus: ^8.1.2
+  receive_sharing_intent: ^1.8.1
+  crypto: ^3.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: icon/app_icon.png
+  adaptive_icon_background: "#1769FF"
+  adaptive_icon_foreground: icon/app_icon.png
+  min_sdk_android: 24
+
+flutter_native_splash:
+  color: "#0B1F4D"
+  color_dark: "#0B1F4D"
+  image: assets/branding/splash_logo.png
+  image_dark: assets/branding/splash_logo.png
+  android_gravity: center
+  fullscreen: true
+  android_12:
+    color: "#0B1F4D"
+    color_dark: "#0B1F4D"
+    image: assets/branding/splash_logo.png
+    image_dark: assets/branding/splash_logo.png
+    icon_background_color: "#1769FF"
+    icon_background_color_dark: "#1769FF"
+  android: true
+  ios: false
+  web: false
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/
+    - assets/tools/
