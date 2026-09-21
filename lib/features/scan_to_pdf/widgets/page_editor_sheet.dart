@@ -10,9 +10,9 @@ import '../../../shared/services/temp_file_service.dart';
 import '../../../shared/widgets/loading_overlay.dart';
 import '../models/scan_enhance_kind.dart';
 import '../models/scan_page.dart';
+import '../providers/scan_session_provider.dart';
 import '../services/image_enhancement_service.dart';
-import '../services/scan_quality_service.dart';
-import 'scan_quality_card.dart';
+import 'document_corner_editor_sheet.dart';
 
 class PageEditorSheet extends ConsumerStatefulWidget {
   const PageEditorSheet({
@@ -30,62 +30,39 @@ class PageEditorSheet extends ConsumerStatefulWidget {
 
 class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
   late ScanEnhanceKind _enhanceKind;
-  late double _brightness;
-  late double _contrast;
   String? _previewPath;
   bool _isProcessing = false;
-  ScanQualityReport? _quality;
-  bool _qualityLoading = true;
 
   @override
   void initState() {
     super.initState();
     _enhanceKind = widget.page.enhanceKind;
-    _brightness = widget.page.brightness;
-    _contrast = widget.page.contrast;
     _previewPath = widget.page.displayImagePath;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadQuality();
+      if (!mounted) return;
       if (_enhanceKind == ScanEnhanceKind.original) {
-        _applyPreset(ScanEnhancementPreset.magicColor);
+        setState(() => _previewPath = widget.page.originalImagePath);
+      } else {
+        _applyPreview();
       }
     });
-  }
-
-  Future<void> _loadQuality() async {
-    try {
-      final report = await ref
-          .read(scanQualityServiceProvider)
-          .analyze(widget.page.originalImagePath);
-      if (mounted) {
-        setState(() {
-          _quality = report;
-          _qualityLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _qualityLoading = false);
-    }
   }
 
   Future<void> _applyPreview() async {
     setState(() => _isProcessing = true);
     try {
       final service = ref.read(imageEnhancementServiceProvider);
-      final path = await service.applyEnhancements(
+      final result = await service.applyEnhancements(
         sourcePath: widget.page.originalImagePath,
         kind: _enhanceKind,
-        brightness: _brightness,
-        contrast: _contrast,
         maxDimension: AppConstants.enhancementPreviewMaxDimension,
         jpegQuality: 78,
         preview: true,
         useCache: false,
       );
       if (mounted) {
-        await _deleteSupersededPreview(path);
-        setState(() => _previewPath = path);
+        await _deleteSupersededPreview(result.path);
+        setState(() => _previewPath = result.path);
       }
     } on AppException catch (e) {
       if (mounted) {
@@ -97,12 +74,31 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
   }
 
   Future<void> _applyPreset(ScanEnhancementPreset preset) async {
-    setState(() {
-      _enhanceKind = preset.kind;
-      _brightness = preset.brightness;
-      _contrast = preset.contrast;
-    });
+    setState(() => _enhanceKind = preset.kind);
+    if (preset.kind == ScanEnhanceKind.original) {
+      setState(() => _previewPath = widget.page.originalImagePath);
+      return;
+    }
     await _applyPreview();
+  }
+
+  Future<void> _openCrop() async {
+    final updated = await DocumentCornerEditorSheet.show(context, page: widget.page);
+    if (updated == null || !mounted) return;
+
+    await ref.read(scanSessionProvider.notifier).enhanceAllPages(
+      pageIds: [updated.id],
+    );
+
+    final refreshed = ref.read(scanSessionProvider).firstWhere(
+          (p) => p.id == updated.id,
+          orElse: () => updated,
+        );
+
+    setState(() {
+      _previewPath = refreshed.displayImagePath;
+      _enhanceKind = ScanEnhanceKind.auto;
+    });
   }
 
   Future<void> _deleteSupersededPreview(String nextPath) async {
@@ -134,20 +130,18 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
     setState(() => _isProcessing = true);
     try {
       final service = ref.read(imageEnhancementServiceProvider);
-      final path = await service.applyEnhancements(
+      final result = await service.applyEnhancements(
         sourcePath: widget.page.originalImagePath,
         kind: _enhanceKind,
-        brightness: _brightness,
-        contrast: _contrast,
         preview: false,
       );
-      await _deleteSupersededPreview(path);
+      await _deleteSupersededPreview(result.path);
       widget.onSave(
         widget.page.copyWith(
-          displayImagePath: path,
-          enhanceKind: _enhanceKind,
-          brightness: _brightness,
-          contrast: _contrast,
+          displayImagePath: result.path,
+          enhanceKind: result.applied ? _enhanceKind : widget.page.enhanceKind,
+          brightness: 0,
+          contrast: 0,
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -178,35 +172,27 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Enhance Page',
+                'Enhance',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Magic Color lifts dim text like CamScanner. B&W is best for printed documents.',
+                'Tap a mode to update the preview instantly.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
               ),
               const SizedBox(height: 12),
-              if (_quality != null) ...[
-                ScanQualityCard(report: _quality!),
-                const SizedBox(height: 12),
-              ] else if (_qualityLoading)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: LinearProgressIndicator(),
-                ),
               SizedBox(
                 height: 40,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: ScanEnhancementPreset.all.length,
+                  itemCount: ScanEnhancementPreset.scanModes.length,
                   separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
                   itemBuilder: (context, index) {
-                    final preset = ScanEnhancementPreset.all[index];
+                    final preset = ScanEnhancementPreset.scanModes[index];
                     final selected = _enhanceKind == preset.kind;
                     return ChoiceChip(
                       label: Text(preset.label),
@@ -223,41 +209,34 @@ class _PageEditorSheetState extends ConsumerState<PageEditorSheet> {
                 borderRadius: BorderRadius.circular(12),
                 child: AspectRatio(
                   aspectRatio: 3 / 4,
-                  child: Image.file(
-                    File(_previewPath ?? widget.page.originalImagePath),
-                    fit: BoxFit.contain,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 420),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: Image.file(
+                      File(_previewPath ?? widget.page.displayImagePath),
+                      key: ValueKey(_previewPath ?? widget.page.displayImagePath),
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text('Brightness: ${_brightness.round()}'),
-              Slider(
-                value: _brightness,
-                min: -40,
-                max: 40,
-                divisions: 32,
-                onChanged: (v) => setState(() => _brightness = v),
-                onChangeEnd: (_) => _applyPreview(),
-              ),
-              Text('Contrast: ${_contrast.round()}'),
-              Slider(
-                value: _contrast,
-                min: -40,
-                max: 40,
-                divisions: 32,
-                onChanged: (v) => setState(() => _contrast = v),
-                onChangeEnd: (_) => _applyPreview(),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isProcessing ? null : _openCrop,
+                icon: const Icon(Icons.crop_free_outlined, size: 18),
+                label: const Text('Adjust Corners'),
               ),
               const SizedBox(height: 8),
               FilledButton(
                 onPressed: _isProcessing ? null : _save,
-                child: const Text('Save Changes'),
+                child: const Text('Done'),
               ),
             ],
           ),
         ),
         if (_isProcessing)
-          const LoadingOverlay(message: 'Enhancing document...'),
+          const LoadingOverlay(message: 'Processing...'),
       ],
     );
   }

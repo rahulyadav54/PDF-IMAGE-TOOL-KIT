@@ -19,8 +19,6 @@ import '../../shared/widgets/step_bar.dart';
 import '../../shared/widgets/tool_app_bar_title.dart';
 import '../scan_to_pdf/models/scan_enhance_kind.dart';
 import '../scan_to_pdf/services/image_enhancement_service.dart';
-import '../scan_to_pdf/services/scan_quality_service.dart';
-import '../scan_to_pdf/widgets/scan_quality_card.dart';
 
 class CleanDocumentScreen extends ConsumerStatefulWidget {
   const CleanDocumentScreen({super.key, this.initialPath});
@@ -35,7 +33,6 @@ class CleanDocumentScreen extends ConsumerStatefulWidget {
 class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
   String? _sourcePath;
   String? _previewPath;
-  ScanQualityReport? _quality;
   ScanEnhanceKind _mode = ScanEnhanceKind.auto;
   bool _isLoading = false;
   bool _isProcessing = false;
@@ -70,8 +67,6 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
         throw const InvalidFileException('File no longer exists.');
       }
 
-      final quality =
-          await ref.read(scanQualityServiceProvider).analyze(path);
       final preview = await ref.read(imageEnhancementServiceProvider).applyEnhancements(
             sourcePath: path,
             kind: ScanEnhanceKind.auto,
@@ -83,8 +78,7 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
 
       setState(() {
         _sourcePath = path;
-        _previewPath = preview;
-        _quality = quality;
+        _previewPath = preview.path;
         _mode = ScanEnhanceKind.auto;
       });
     } on AppException catch (e) {
@@ -112,7 +106,7 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
             preview: true,
             useCache: false,
           );
-      if (mounted) setState(() => _previewPath = preview);
+      if (mounted) setState(() => _previewPath = preview.path);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -141,9 +135,9 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
 
       await ref.read(entitlementServiceProvider).recordOperation();
 
-      final size = await ref.read(fileServiceProvider).getFileSize(output);
+      final size = await ref.read(fileServiceProvider).getFileSize(output.path);
       final entry = await ref.read(recentFilesServiceProvider).createEntry(
-            filePath: output,
+            filePath: output.path,
             operation: 'Clean Document',
             fileSizeBytes: size,
           );
@@ -154,9 +148,9 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
         MaterialPageRoute(
           builder: (context) => ResultScreen(
             title: 'Document Cleaned',
-            outputPath: output,
+            outputPath: output.path,
             fileActions: ref.read(fileActionsServiceProvider),
-            subtitle: ref.read(fileServiceProvider).getFileName(output),
+            subtitle: ref.read(fileServiceProvider).getFileName(output.path),
             newSizeBytes: size,
             onProcessAnother: () => Navigator.of(context).pop(),
           ),
@@ -222,8 +216,6 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
                     label: const Text('Choose Photo'),
                   ),
                 ] else ...[
-                  if (_quality != null) ScanQualityCard(report: _quality!),
-                  const SizedBox(height: AppSpacing.md),
                   if (_previewPath != null)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -245,16 +237,16 @@ class _CleanDocumentScreenState extends ConsumerState<CleanDocumentScreen> {
                         onSelected: (_) => _updatePreview(ScanEnhanceKind.auto),
                       ),
                       ChoiceChip(
-                        label: const Text('Document'),
-                        selected: _mode == ScanEnhanceKind.document,
-                        onSelected: (_) =>
-                            _updatePreview(ScanEnhanceKind.document),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Magic Color'),
+                        label: const Text('Color'),
                         selected: _mode == ScanEnhanceKind.magicColor,
                         onSelected: (_) =>
                             _updatePreview(ScanEnhanceKind.magicColor),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Gray'),
+                        selected: _mode == ScanEnhanceKind.grayscale,
+                        onSelected: (_) =>
+                            _updatePreview(ScanEnhanceKind.grayscale),
                       ),
                       ChoiceChip(
                         label: const Text('B&W'),

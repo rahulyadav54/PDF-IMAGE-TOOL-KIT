@@ -36,7 +36,7 @@ class _IdCardScanScreenState extends ConsumerState<IdCardScanScreen> {
               kind: ScanEnhanceKind.document,
               preview: false,
             );
-        setState(() => _frontPath = enhanced);
+        setState(() => _frontPath = enhanced.path);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -53,7 +53,7 @@ class _IdCardScanScreenState extends ConsumerState<IdCardScanScreen> {
               kind: ScanEnhanceKind.document,
               preview: false,
             );
-        setState(() => _backPath = enhanced);
+        setState(() => _backPath = enhanced.path);
       }
     } finally {
       if (mounted) setState(() => _busy = false);

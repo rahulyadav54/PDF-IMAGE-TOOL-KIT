@@ -31,49 +31,75 @@ class ScanEnhancementPreset {
     kind: ScanEnhanceKind.auto,
   );
 
-  static const magicColor = ScanEnhancementPreset(
-    label: 'Magic Color',
+  static const color = ScanEnhancementPreset(
+    label: 'Color',
     kind: ScanEnhanceKind.magicColor,
   );
+
+  static const magicColor = color;
 
   static const document = ScanEnhancementPreset(
     label: 'Document',
     kind: ScanEnhanceKind.document,
   );
 
-  static const grayscale = ScanEnhancementPreset(
-    label: 'Grayscale',
+  static const gray = ScanEnhancementPreset(
+    label: 'Gray',
     kind: ScanEnhanceKind.grayscale,
   );
+
+  static const grayscale = gray;
 
   static const blackAndWhite = ScanEnhancementPreset(
     label: 'B&W',
     kind: ScanEnhanceKind.blackWhite,
   );
 
-  static const reset = ScanEnhancementPreset(
+  static const original = ScanEnhancementPreset(
     label: 'Original',
     kind: ScanEnhanceKind.original,
   );
 
-  static const List<ScanEnhancementPreset> all = [
+  static const reset = original;
+
+  static const List<ScanEnhancementPreset> scanModes = [
     auto,
-    magicColor,
-    document,
-    grayscale,
+    original,
+    color,
+    gray,
     blackAndWhite,
-    reset,
   ];
+
+  static const List<ScanEnhancementPreset> all = scanModes;
+}
+
+class ApplyEnhanceResult {
+  const ApplyEnhanceResult({
+    required this.path,
+    required this.applied,
+  });
+
+  final String path;
+  final bool applied;
 }
 
 class BulkEnhanceResult {
   const BulkEnhanceResult({
     required this.outputPaths,
     required this.failedPaths,
+    required this.revertedPaths,
+    required this.appliedPaths,
   });
 
   final Map<String, String> outputPaths;
   final Map<String, String> failedPaths;
+  final Map<String, String> revertedPaths;
+  final Map<String, bool> appliedPaths;
+
+  int get appliedCount =>
+      appliedPaths.values.where((applied) => applied).length;
+
+  int get revertedCount => revertedPaths.length;
 }
 
 class ImageEnhancementService {
@@ -87,8 +113,8 @@ class ImageEnhancementService {
     int maxDimension = 2200,
     int jpegQuality = 88,
     bool preview = false,
-  }) {
-    return applyEnhancements(
+  }) async {
+    final result = await applyEnhancements(
       sourcePath: sourcePath,
       kind: preset.kind,
       brightness: preset.brightness,
@@ -97,9 +123,10 @@ class ImageEnhancementService {
       jpegQuality: jpegQuality,
       preview: preview,
     );
+    return result.path;
   }
 
-  Future<String> applyEnhancements({
+  Future<ApplyEnhanceResult> applyEnhancements({
     required String sourcePath,
     ScanEnhanceKind kind = ScanEnhanceKind.original,
     double brightness = 0,
@@ -110,7 +137,11 @@ class ImageEnhancementService {
     bool useCache = true,
   }) async {
     if (kind == ScanEnhanceKind.original && brightness == 0 && contrast == 0) {
-      return _copyOriginalOriented(sourcePath, jpegQuality: jpegQuality);
+      final path = await _copyOriginalOriented(
+        sourcePath,
+        jpegQuality: jpegQuality,
+      );
+      return ApplyEnhanceResult(path: path, applied: false);
     }
 
     final cacheService = _ref.read(enhancementCacheServiceProvider);
@@ -123,7 +154,9 @@ class ImageEnhancementService {
         maxDimension: maxDimension,
         jpegQuality: jpegQuality,
       );
-      if (cached != null) return cached;
+      if (cached != null) {
+        return ApplyEnhanceResult(path: cached, applied: true);
+      }
     }
 
     final bytes = await File(sourcePath).readAsBytes();
@@ -131,7 +164,7 @@ class ImageEnhancementService {
       throw const InvalidFileException('Unable to read the scanned image.');
     }
 
-    final outputBytes = await compute(
+    final isolateResult = await compute(
       enhanceImageInIsolate,
       ImageEnhanceParams(
         bytes: bytes,
@@ -146,21 +179,25 @@ class ImageEnhancementService {
 
     final tempService = _ref.read(tempFileServiceProvider);
     final outputPath = await tempService.createTempFile(extension: '.jpg');
-    await File(outputPath).writeAsBytes(outputBytes, flush: true);
+    await File(outputPath).writeAsBytes(isolateResult.bytes, flush: true);
 
-    if (useCache && !preview) {
-      return cacheService.store(
+    if (useCache && !preview && isolateResult.applied) {
+      final cachedPath = await cacheService.store(
         sourcePath: sourcePath,
         kind: kind,
         brightness: brightness,
         contrast: contrast,
         maxDimension: maxDimension,
         jpegQuality: jpegQuality,
-        bytes: outputBytes,
+        bytes: isolateResult.bytes,
       );
+      return ApplyEnhanceResult(path: cachedPath, applied: true);
     }
 
-    return outputPath;
+    return ApplyEnhanceResult(
+      path: outputPath,
+      applied: isolateResult.applied,
+    );
   }
 
   Future<BulkEnhanceResult> enhanceMany({
@@ -175,6 +212,8 @@ class ImageEnhancementService {
   }) async {
     final outputPaths = <String, String>{};
     final failedPaths = <String, String>{};
+    final revertedPaths = <String, String>{};
+    final appliedPaths = <String, bool>{};
 
     await WorkerPool.mapConcurrent<String, void>(
       items: sourcePaths,
@@ -186,7 +225,7 @@ class ImageEnhancementService {
       worker: (path, _) async {
         try {
           cancelToken?.throwIfCancelled();
-          final enhanced = await applyEnhancements(
+          final result = await applyEnhancements(
             sourcePath: path,
             kind: kind,
             brightness: brightness,
@@ -194,7 +233,12 @@ class ImageEnhancementService {
             maxDimension: maxDimension,
             jpegQuality: jpegQuality,
           );
-          outputPaths[path] = enhanced;
+          outputPaths[path] = result.path;
+          appliedPaths[path] = result.applied;
+          if (!result.applied) {
+            revertedPaths[path] =
+                'Enhancement did not improve this page — try better lighting or retake.';
+          }
         } catch (e) {
           failedPaths[path] = e.toString();
         }
@@ -204,6 +248,8 @@ class ImageEnhancementService {
     return BulkEnhanceResult(
       outputPaths: outputPaths,
       failedPaths: failedPaths,
+      revertedPaths: revertedPaths,
+      appliedPaths: appliedPaths,
     );
   }
 

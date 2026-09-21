@@ -48,6 +48,8 @@ void main() {
       final result = DocumentImagePipeline.process(image);
       expect(result.image.width, greaterThan(0));
       expect(result.image.height, greaterThan(0));
+      expect(result.corners, isA<List>());
+      expect(result.needsManualAdjustment, isA<bool>());
     });
   });
 }

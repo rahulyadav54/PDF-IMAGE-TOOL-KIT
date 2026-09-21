@@ -6,7 +6,7 @@ import '../../core/errors/app_exception.dart';
 import '../../core/utils/progress_throttle.dart';
 import '../../shared/services/bulk_processing/cancel_token.dart'
     show BulkCancelledException, CancelToken;
-import '../../shared/widgets/processing_job_overlay.dart';
+import 'widgets/scan_processing_overlay.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -22,11 +22,12 @@ import 'providers/scan_session_provider.dart';
 import 'services/document_scanner_service.dart';
 import 'services/image_enhancement_service.dart';
 import 'services/scan_pdf_service.dart';
-import 'services/scan_quality_service.dart';
+import 'models/scan_capture_source.dart';
 import 'models/scan_mode.dart';
+import 'widgets/document_corner_editor_sheet.dart';
 import 'widgets/page_editor_sheet.dart';
 import 'widgets/scan_pages_list.dart';
-import 'widgets/scan_quality_review_sheet.dart';
+import 'widgets/scan_preview_sheet.dart';
 
 class ScanToPdfScreen extends ConsumerStatefulWidget {
   const ScanToPdfScreen({super.key, this.initialMode});
@@ -42,27 +43,18 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
   bool _isBusy = false;
   String? _busyMessage;
   CancelToken? _cancelToken;
-  int _enhanceCurrent = 0;
-  int _enhanceTotal = 0;
+  int _processCurrent = 0;
+  int _processTotal = 0;
+  bool _showScanProcessing = false;
+  ScanProcessingStage _processingStage = ScanProcessingStage.detecting;
+  double _processingProgress = 0;
+  String? _processingPreviewPath;
   final _progressThrottle = ProgressThrottle();
 
   @override
   void initState() {
     super.initState();
     _scanMode = widget.initialMode ?? ScanMode.document;
-  }
-
-  ScanEnhancementPreset _presetForMode() {
-    switch (_scanMode) {
-      case ScanMode.receipt:
-        return ScanEnhancementPreset.blackAndWhite;
-      case ScanMode.book:
-        return ScanEnhancementPreset.magicColor;
-      case ScanMode.idCard:
-        return ScanEnhancementPreset.document;
-      case ScanMode.document:
-        return ScanEnhancementPreset.magicColor;
-    }
   }
 
   void _showError(String message) {
@@ -100,41 +92,162 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     }
   }
 
-  Future<void> _reviewNewPages(List<String> paths, int startIndex) async {
-    if (paths.isEmpty || !mounted) return;
-
-    final qualityService = ref.read(scanQualityServiceProvider);
-    for (var i = 0; i < paths.length; i++) {
-      if (!mounted) return;
-      final report = await qualityService.analyze(paths[i]);
-      if (!mounted) return;
-
-      if (report.score < 70 || report.shouldRetake) {
-        final keep = await ScanQualityReviewSheet.show(
-          context,
-          report: report,
-          pageLabel: paths.length == 1
-              ? 'Scan quality'
-              : 'Page ${i + 1} of ${paths.length}',
-        );
-        if (!keep && mounted) {
-          final pages = ref.read(scanSessionProvider);
-          final pageIndex = startIndex + i;
-          if (pageIndex < pages.length) {
-            await ref
-                .read(scanSessionProvider.notifier)
-                .removePage(pages[pageIndex].id);
-          }
-        }
-      }
+  ScanProcessingStage _stageFromMessage(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('enhanc')) return ScanProcessingStage.enhancing;
+    if (lower.contains('correct') ||
+        lower.contains('crop') ||
+        lower.contains('perspective')) {
+      return ScanProcessingStage.cropping;
     }
+    return ScanProcessingStage.detecting;
   }
 
-  Future<void> _addPagesWithQualityReview(List<String> paths) async {
-    if (paths.isEmpty) return;
-    final startIndex = ref.read(scanSessionProvider).length;
-    ref.read(scanSessionProvider.notifier).addPages(paths);
-    await _reviewNewPages(paths, startIndex);
+  Future<void> _processAndAddPages(
+    List<String> paths, {
+    ScanCaptureSource source = ScanCaptureSource.gallery,
+  }) async {
+    if (paths.isEmpty || !mounted) return;
+
+    setState(() {
+      _isBusy = true;
+      _showScanProcessing = true;
+      _busyMessage = 'Detecting document...';
+      _processCurrent = 0;
+      _processTotal = paths.length;
+      _processingStage = ScanProcessingStage.detecting;
+      _processingProgress = 0.05;
+      _processingPreviewPath = paths.first;
+    });
+
+    try {
+      final processResult =
+          await ref.read(scanSessionProvider.notifier).addAndProcessPages(
+        paths,
+        source: source,
+        onProgress: (current, total, message) {
+          if (!mounted) return;
+          _progressThrottle.call(() {
+            if (!mounted) return;
+            final stage = _stageFromMessage(message);
+            final pageProgress = total == 0 ? 0.0 : (current + 1) / total;
+            setState(() {
+              _processCurrent = current + 1;
+              _processTotal = total;
+              _busyMessage = message;
+              _processingStage = stage;
+              _processingPreviewPath = paths[current.clamp(0, paths.length - 1)];
+              _processingProgress = stage == ScanProcessingStage.detecting
+                  ? pageProgress * 0.42
+                  : 0.42 + pageProgress * 0.18;
+            });
+          });
+        },
+      );
+
+      if (!mounted) return;
+
+      for (final page in processResult.needsManualCornerPages) {
+        if (mounted) {
+          setState(() {
+            _processingStage = ScanProcessingStage.cropping;
+            _busyMessage = 'Adjust document corners';
+            _processingProgress = 0.58;
+            _processingPreviewPath = page.rawCapturePath;
+          });
+        }
+        final adjusted = await DocumentCornerEditorSheet.show(context, page: page);
+        if (adjusted != null && mounted) {
+          setState(() {
+            _processingPreviewPath = adjusted.originalImagePath;
+            _processingProgress = 0.62;
+          });
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _busyMessage = 'Enhancing...';
+        _processCurrent = 0;
+        _processTotal = processResult.pages.length;
+        _processingStage = ScanProcessingStage.enhancing;
+        _processingProgress = 0.62;
+        if (processResult.pages.isNotEmpty) {
+          _processingPreviewPath = processResult.pages.last.originalImagePath;
+        }
+      });
+
+      _cancelToken = CancelToken();
+      final enhanceResult = await ref
+          .read(scanSessionProvider.notifier)
+          .enhanceAllPages(
+            preset: ScanEnhancementPreset.auto,
+            pageIds: processResult.pages.map((p) => p.id).toList(),
+            cancelToken: _cancelToken,
+            onProgress: (current, total) {
+              if (!mounted) return;
+              _progressThrottle.call(() {
+                if (!mounted) return;
+                final progress = total == 0 ? 0.0 : current / total;
+                setState(() {
+                  _processCurrent = current;
+                  _processTotal = total;
+                  _processingStage = ScanProcessingStage.enhancing;
+                  _processingProgress = 0.62 + progress * 0.35;
+                });
+              });
+            },
+          );
+
+      if (!mounted) return;
+
+      if (enhanceResult.anyApplied) {
+        _showSuccess('Document scanned and enhanced.');
+      } else if (enhanceResult.anyFailed) {
+        _showError('Enhancement could not improve this scan — try retaking.');
+      }
+
+      ScanPage? lastPage;
+      if (processResult.pages.isNotEmpty) {
+        final targetId = processResult.pages.last.id;
+        lastPage = ref
+            .read(scanSessionProvider)
+            .where((p) => p.id == targetId)
+            .firstOrNull;
+      }
+
+      if (lastPage != null && mounted) {
+        final previewPage = lastPage;
+        await ScanPreviewSheet.show(
+          context,
+          page: previewPage,
+          onRetake: () => ref
+              .read(scanSessionProvider.notifier)
+              .removePage(previewPage.id),
+          onCrop: () => _openCornerEditor(previewPage),
+          onEnhance: () => _openEditor(previewPage),
+          onDone: () {},
+        );
+      }
+    } on BulkCancelledException {
+      if (mounted) _showError('Processing cancelled.');
+    } on AppException catch (e) {
+      if (mounted) _showError(e.message);
+    } catch (_) {
+      if (mounted) _showError('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBusy = false;
+          _showScanProcessing = false;
+          _busyMessage = null;
+          _cancelToken = null;
+          _processingProgress = 0;
+          _processingPreviewPath = null;
+        });
+      }
+    }
   }
 
   Future<void> _addMultipleFromScanner() async {
@@ -142,7 +255,12 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     await _runBusy('Opening scanner...', () async {
       paths = await ref.read(documentScannerServiceProvider).scanMultiplePages();
     });
-    if (paths.isNotEmpty) await _addPagesWithQualityReview(paths);
+    if (paths.isNotEmpty) {
+      await _processAndAddPages(
+        paths,
+        source: ScanCaptureSource.nativeScanner,
+      );
+    }
   }
 
   Future<void> _addFromGallery() async {
@@ -150,7 +268,9 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     await _runBusy('Opening gallery...', () async {
       paths = await ref.read(documentScannerServiceProvider).pickFromGalleryScanner();
     });
-    if (paths.isNotEmpty) await _addPagesWithQualityReview(paths);
+    if (paths.isNotEmpty) {
+      await _processAndAddPages(paths, source: ScanCaptureSource.gallery);
+    }
   }
 
   Future<void> _addFromFiles() async {
@@ -158,7 +278,9 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     await _runBusy('Selecting images...', () async {
       paths = await ref.read(documentScannerServiceProvider).pickImagesFromFiles();
     });
-    if (paths.isNotEmpty) await _addPagesWithQualityReview(paths);
+    if (paths.isNotEmpty) {
+      await _processAndAddPages(paths, source: ScanCaptureSource.files);
+    }
   }
 
   Future<void> _enhanceAllPages() async {
@@ -169,34 +291,34 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     setState(() {
       _isBusy = true;
       _busyMessage = 'Enhancing pages...';
-      _enhanceCurrent = 0;
-      _enhanceTotal = pages.length;
+      _processCurrent = 0;
+      _processTotal = pages.length;
     });
 
     try {
-      await ref.read(scanSessionProvider.notifier).enhanceAllPages(
-        preset: _presetForMode(),
+      final result = await ref.read(scanSessionProvider.notifier).enhanceAllPages(
+        preset: ScanEnhancementPreset.auto,
         onProgress: (current, total) {
           if (!mounted) return;
           _progressThrottle.call(() {
             if (!mounted) return;
             setState(() {
-              _enhanceCurrent = current;
-              _enhanceTotal = total;
+              _processCurrent = current;
+              _processTotal = total;
             });
           });
         },
         cancelToken: _cancelToken,
       );
-      if (mounted) {
-        _showSuccess('Magic Color applied — dim text is now clearer.');
+      if (!mounted) return;
+
+      if (result.anyApplied) {
+        _showSuccess('Auto enhance applied to your pages.');
+      } else if (result.anyFailed) {
+        _showError('Could not enhance — try retaking with better lighting.');
       }
     } on BulkCancelledException {
       if (mounted) _showError('Enhancement cancelled.');
-    } on AppException catch (e) {
-      if (mounted) _showError(e.message);
-    } catch (_) {
-      if (mounted) _showError('Something went wrong. Please try again.');
     } finally {
       if (mounted) {
         setState(() {
@@ -208,12 +330,12 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
     }
   }
 
-  Future<void> _confirmCancelEnhance() async {
+  Future<void> _confirmCancelProcessing() async {
     final shouldCancel = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel processing?'),
-        content: const Text('Enhancement will stop for remaining pages.'),
+        content: const Text('Processing will stop for remaining pages.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -281,6 +403,29 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _openCornerEditor(ScanPage page) async {
+    final updated = await DocumentCornerEditorSheet.show(context, page: page);
+    if (updated == null || !mounted) return;
+
+    setState(() {
+      _isBusy = true;
+      _busyMessage = 'Enhancing...';
+    });
+
+    try {
+      await ref.read(scanSessionProvider.notifier).enhanceAllPages(
+        pageIds: [updated.id],
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBusy = false;
+          _busyMessage = null;
+        });
+      }
+    }
   }
 
   @override
@@ -401,7 +546,7 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
                               child: OutlinedButton.icon(
                                 onPressed: _isBusy ? null : _enhanceAllPages,
                                 icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
-                                label: const Text('Magic Color'),
+                                label: const Text('Auto Enhance'),
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -422,13 +567,14 @@ class _ScanToPdfScreenState extends ConsumerState<ScanToPdfScreen> {
             ),
           ),
         ),
-        if (_isBusy && _busyMessage != null && _enhanceTotal > 0)
-          ProcessingJobOverlay(
-            title: 'Enhancing images',
-            completed: _enhanceCurrent,
-            total: _enhanceTotal,
-            currentLabel: _busyMessage,
-            onCancel: _confirmCancelEnhance,
+        if (_isBusy && _showScanProcessing)
+          ScanProcessingOverlay(
+            stage: _processingStage,
+            progress: _processingProgress,
+            previewPath: _processingPreviewPath,
+            pageIndex: _processCurrent.clamp(1, _processTotal),
+            pageTotal: _processTotal,
+            onCancel: _confirmCancelProcessing,
           )
         else if (_isBusy && _busyMessage != null)
           LoadingOverlay(message: _busyMessage!),
@@ -491,7 +637,7 @@ class _ScannerHero extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Auto edge detection • Crop • Enhance • Up to ${AppConstants.maxScanPages} pages',
+            'Detect → Crop → Enhance → Save',
             style: AppTypography.caption(context),
             textAlign: TextAlign.center,
           ),

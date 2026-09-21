@@ -28,8 +28,8 @@ class ContentBoundsDetector {
   const ContentBoundsDetector._();
 
   static const int _sampleWidth = 360;
-  static const double _activityThreshold = 0.035;
-  static const double _minTrimFraction = 0.04;
+  static const double _activityThreshold = 0.032;
+  static const double _minTrimFraction = 0.05;
 
   static ContentBoundsResult detect(img.Image source) {
     final sample = img.copyResize(source, width: _sampleWidth);
@@ -62,7 +62,7 @@ class ContentBoundsDetector {
     final maxCol = colActivity.reduce(math.max);
     final threshold = math.max(
       _activityThreshold,
-      math.min(maxRow, maxCol) * 0.35,
+      math.min(maxRow, maxCol) * 0.28,
     );
 
     var top = 0;

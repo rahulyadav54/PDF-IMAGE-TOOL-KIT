@@ -44,7 +44,7 @@ class _ImageEnhancementPreviewDialogState
       _loading = true;
     });
     try {
-      final path = await ref.read(imageEnhancementServiceProvider).applyEnhancements(
+      final result = await ref.read(imageEnhancementServiceProvider).applyEnhancements(
             sourcePath: widget.image.filePath,
             kind: kind,
             maxDimension: AppConstants.enhancementPreviewMaxDimension,
@@ -52,7 +52,7 @@ class _ImageEnhancementPreviewDialogState
             preview: true,
             useCache: true,
           );
-      if (mounted) setState(() => _previewPath = path);
+      if (mounted) setState(() => _previewPath = result.path);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

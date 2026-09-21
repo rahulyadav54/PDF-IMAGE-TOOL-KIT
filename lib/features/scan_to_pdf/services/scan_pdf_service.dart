@@ -82,6 +82,7 @@ class ScanPdfService {
         bytes: rawBytes,
         maxWidth: maxImageWidth,
         jpegQuality: jpegQuality,
+        skipDocumentGeometry: true,
       ),
     );
   }
